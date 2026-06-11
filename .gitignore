@@ -1,0 +1,10 @@
+/events_api/events_api/obj
+/events_api/events_api/bin
+*.dll
+*.exe
+*.suo
+*.user
+*.userosscache
+*.csproj.user
+*.vssscc
+*.vspscc
