@@ -1,23 +1,42 @@
+using events_api.Data;
+using events_api.Interfaces;
+using events_api.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 
-builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+//Регистрируем зависимости в DI-контейнере
+builder.Services.AddScoped<IEventRepository, EventRepository>();
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+//  DI автоматически внедряет зависимости
+app.MapGet("/events", (EventService eventService) =>
 {
-    app.MapOpenApi();
-}
+    var events = eventService.GetAllEvents();
+    return Results.Ok(events);
+});
 
-app.UseHttpsRedirection();
+app.MapGet("/events/{id:int}", (int id, EventService eventService) =>
+{
+    var eventItem = eventService.GetEvent(id);
+    return eventItem != null ? Results.Ok(eventItem) : Results.NotFound();
+});
 
-app.UseAuthorization();
+app.MapPost("/events", (CreateEventRequest request, EventService eventService) =>
+{
+    eventService.CreateOrder(request.CustomerName, request.TotalAmount);
+    return Results.Ok(new { message = "Заказ создан" });
+});
 
-app.MapControllers();
+app.MapPost("/events/{id:int}/confirm", (int id, EventService eventService) =>
+{
+    eventService.ConfirmOrder(id);
+    return Results.Ok(new { message = "Заказ подтверждён" });
+});
 
 app.Run();
+
+record CreateEventRequest(string CustomerName, decimal TotalAmount);

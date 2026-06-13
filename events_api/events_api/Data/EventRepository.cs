@@ -2,8 +2,9 @@
 using events_api.Models;
 
 namespace events_api.Data
+
 {
-    public class EventRepository : IEventService
+    public class EventRepository : IEventRepository
     {
         private readonly List<Event> _events = new();
         public EventRepository()
@@ -19,16 +20,16 @@ namespace events_api.Data
             });
             _events.Add(new Event
             {
-                Id = 1,
+                Id = 2,
                 Title = "Мозгарадная вечеринка",
                 Description = "Думаем сразу много мыслей",
                 StartAt = DateTime.Now.AddDays(3),
                 EndAt = DateTime.Now.AddDays(10)
             });
         }
-    
 
-     public Event? GetById(int id)
+
+        public Event? GetById(int id)
         {
             Console.WriteLine($"[EventRepository] Получение события #{id} из базы данных");
             return _events.FirstOrDefault(o => o.Id == id);
@@ -47,20 +48,53 @@ namespace events_api.Data
             Console.WriteLine($"[EventRepository] Событие #{eventItem.Id} добавлен в базу данных");
         }
 
-        public void Update(Event eventItem)
+        public bool Update(int id, UpdateEventRequest request, out List<string> errors)
         {
-            var existing = _events.FirstOrDefault(o => o.Id == eventItem.Id);
-            if (existing != null)
+            errors = new List<string>();
+            var existingEvent = GetById(id);
+
+            if (existingEvent == null)
             {
-                existing.Title = eventItem.Title;
-                existing.Description = eventItem.Description;
-                existing.StartAt = eventItem.StartAt;
-                existing.EndAt = eventItem.EndAt;
+                errors.Add("Событие не найдено");
+                return false;
+            }
 
-                Console.WriteLine($"[EventRepository] Событие #{eventItem.Id} обновлён в базе данных");
-            
+            // Обновляем Title (если передан)
+            if (request.Title != null)
+            {
+                existingEvent.Title = request.Title;
+            }
+
+            // Обновляем Description (если передан — даже пустая строка)
+            if (request.Description != null)
+            {
+                existingEvent.Description = request.Description;
+            }
+
+            // Обновляем StartAt (если передан)
+            if (request.StartAt.HasValue)
+            {
+                existingEvent.StartAt = request.StartAt.Value;
+            }
+
+            // Обновляем EndAt (если передан)
+            if (request.EndAt.HasValue)
+            {
+                existingEvent.EndAt = request.EndAt.Value;
+            }
+
+            // Финальная проверка: EndAt не может быть меньше StartAt
+            if (existingEvent.EndAt < existingEvent.StartAt)
+            {
+                errors.Add("EndAt не может быть меньше StartAt");
+                return false;
+            }
+
+            return true;
         }
+
+
     }
+        
 
-}
-
+    
