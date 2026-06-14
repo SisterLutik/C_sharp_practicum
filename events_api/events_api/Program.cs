@@ -4,8 +4,11 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Добавляем контроллеры
+// Добавляем сервисы
 builder.Services.AddControllers();
+
+// ✅ ИСПРАВЛЕНО: AddSingleton вместо AddScoped (для in-memory списка)
+builder.Services.AddSingleton<IEventService, EventService>();
 
 // Добавляем Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -19,18 +22,14 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// ✅ Регистрация EventService как Singleton (для in-memory хранилища)
-builder.Services.AddSingleton<IEventService, EventService>();
-
 var app = builder.Build();
 
-// Настройка Swagger
+// Настройка конвейера запросов
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    // Перенаправление с корня на Swagger
     app.MapGet("/", () => Results.Redirect("/swagger"));
 }
 
