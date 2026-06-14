@@ -1,76 +1,104 @@
 ﻿using events_api.Interfaces;
 using events_api.Models;
-using System.Security.Cryptography.X509Certificates;
 
 namespace events_api.Services
+
 {
-    public class EventService
+    public class EventService : IEventService
     {
-        private readonly IEventRepository _repository;
-
-        // Конструктор принимает интерфейсы, а не конкретные реализации
-        public EventService(IEventRepository repository)
+        private readonly List<Event> _events = new();
+        public EventService()
         {
-            _repository = repository;
-        }
-
-        public Event? GetEvent(int id)
-        {
-            return _repository.GetById(id);
-        }
-
-        public List<Event> GetAllEvents()
-        {
-            return _repository.GetAll();
-        }
-
-        public void CreateEvent(string title, string description, DateTime startAt, DateTime endAt)
-        {
-            var eventItem = new Event
+            // Имитация данных из БД
+            _events.Add(new Event
             {
-                Title = title,
-                Description = description,
-                StartAt = startAt,
-                EndAt = endAt
-            };
-
-            _repository.Add(eventItem);
-
-            Console.WriteLine($"Событие #{eventItem.Id} успешно создано");
+                Id = 1,
+                Title = "Интенсив по ловли жуков",
+                Description = "Увлекательный аттракцион",
+                StartAt = DateTime.Now.AddDays(-2),
+                EndAt = DateTime.Now
+            });
+            _events.Add(new Event
+            {
+                Id = 2,
+                Title = "Мозгарадная вечеринка",
+                Description = "Думаем сразу много мыслей",
+                StartAt = DateTime.Now.AddDays(3),
+                EndAt = DateTime.Now.AddDays(10)
+            });
         }
 
-        public void UpdateEvent(int EventId, UpdateEventRequest request)
+
+        public Event? GetById(int id)
+        {
+            Console.WriteLine($"[EventRepository] Получение события #{id} из базы данных");
+            return _events.FirstOrDefault(o => o.Id == id);
+        }
+
+        public List<Event> GetAll()
+        {
+            Console.WriteLine("[EventRepository] Получение всех событий из базы данных");
+            return _events;
+        }
+
+        public void Add(Event eventItem)
+        {
+            eventItem.Id = _events.Any() ? _events.Max(o => o.Id) + 1 : 1;
+            _events.Add(eventItem);
+            Console.WriteLine($"[EventRepository] Событие #{eventItem.Id} добавлен в базу данных");
+        }
+
+        public void Delete (int id)
+        {
+
+            var eventItem = GetById(id);
+            if (eventItem != null)
+            {
+                _events.Remove(eventItem);
+                Console.WriteLine($"[EventService] Событие #{id} удалено");
+            }
+            else
+            {
+                Console.WriteLine($"[EventService] Событие #{id} не найдено");
+            }
+
+        }
+
+        public void Update(int id, UpdateEventRequest request)
         {
             {
-                var eventItem = _repository.GetById(EventId);
+                var eventItem = GetById(id);
                 if (eventItem == null)
 
                 {
-                    Console.WriteLine($"Событие #{EventId} не найдено");
+                    Console.WriteLine($"Событие #{id} не найдено");
                     return;
                 }
-                if (eventItem.Title != null)
+                if (request.Title != null)
                     eventItem.Title = request.Title;
 
                 if (request.Description != null)
-                    existingEvent.Description = request.Description;
+                    eventItem.Description = request.Description;
 
                 if (request.StartAt.HasValue)
-                    existingEvent.StartAt = request.StartAt.Value;
+                    eventItem.StartAt = request.StartAt.Value;
 
                 if (request.EndAt.HasValue)
-                    existingEvent.EndAt = request.EndAt.Value;
+                    eventItem.EndAt = request.EndAt.Value;
 
                 // Проверка EndAt >= StartAt
-                if (existingEvent.EndAt < existingEvent.StartAt)
+                if (eventItem.EndAt < eventItem.StartAt)
                     throw new InvalidOperationException("EndAt не может быть меньше StartAt");
+
+
+
+                Console.WriteLine($"Событие #{eventItem.Id} успешно создано");
             }
-
-
-            Console.WriteLine($"Событие #{eventItem.Id} успешно создано");
         }
+
 
     }
 }
+        
 
-
+    

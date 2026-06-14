@@ -1,42 +1,42 @@
-using events_api.Data;
 using events_api.Interfaces;
 using events_api.Services;
+using Microsoft.OpenApi;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Добавляем сервисы
+builder.Services.AddControllers();
+builder.Services.AddScoped<IEventService, EventService>();
 
-//Регистрируем зависимости в DI-контейнере
-builder.Services.AddScoped<IEventRepository, EventRepository>();
+// Добавляем Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo  
+    {
+        Title = "Events API",
+        Version = "v1",
+        Description = "API для управления событиями"
+    });
+});
 
-builder.Services.AddOpenApi();
+// ✅ Регистрация Dependency Injection
+builder.Services.AddScoped<IEventService, EventService>();
 
 var app = builder.Build();
 
-//  DI автоматически внедряет зависимости
-app.MapGet("/events", (EventService eventService) =>
+// Настройка конвейера запросов
+if (app.Environment.IsDevelopment())
 {
-    var events = eventService.GetAllEvents();
-    return Results.Ok(events);
-});
+    app.UseSwagger();
+    app.UseSwaggerUI();
 
-app.MapGet("/events/{id:int}", (int id, EventService eventService) =>
-{
-    var eventItem = eventService.GetEvent(id);
-    return eventItem != null ? Results.Ok(eventItem) : Results.NotFound();
-});
+    app.MapGet("/", () => Results.Redirect("/swagger"));
 
-app.MapPost("/events", (CreateEventRequest request, EventService eventService) =>
-{
-    eventService.CreateOrder(request.CustomerName, request.TotalAmount);
-    return Results.Ok(new { message = "Заказ создан" });
-});
+}
 
-app.MapPost("/events/{id:int}/confirm", (int id, EventService eventService) =>
-{
-    eventService.ConfirmOrder(id);
-    return Results.Ok(new { message = "Заказ подтверждён" });
-});
+app.UseHttpsRedirection();
+app.MapControllers();
 
 app.Run();
-
-record CreateEventRequest(string CustomerName, decimal TotalAmount);

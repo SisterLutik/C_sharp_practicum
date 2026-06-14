@@ -2,11 +2,12 @@
 
 namespace events_api.Interfaces
 {
-    public interface IEventRepository
+    public interface IEventService
     {
         Event? GetById(int id);
         List<Event> GetAll();
         void Add(Event eventItem);
-        bool Update(int id, UpdateEventRequest request, out List<string> errors);
+        void Delete(int id);
+        void Update(int id, UpdateEventRequest request);
         }
 }

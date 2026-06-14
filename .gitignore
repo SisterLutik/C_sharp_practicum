@@ -8,3 +8,4 @@
 *.csproj.user
 *.vssscc
 *.vspscc
+/events_api/.vs
