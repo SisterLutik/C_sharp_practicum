@@ -15,130 +15,55 @@ namespace events_api.Controllers
             _eventService = eventService;
         }
 
-        /// <summary>
-        /// GET /events — получить список всех событий
-        /// </summary>
         [HttpGet]
-        [ProducesResponseType(typeof(List<Event>), 200)]
         public IActionResult GetAll()
         {
-            var events = _eventService.GetAll();
-            return Ok(events);
+            return Ok(_eventService.GetAll());
         }
 
-        /// <summary>
-        /// GET /events/{id} — получить событие по id
-        /// </summary>
         [HttpGet("{id}")]
-        [ProducesResponseType(typeof(Event), 200)]
-        [ProducesResponseType(404)]
         public IActionResult GetById(int id)
         {
             var eventItem = _eventService.GetById(id);
-
             if (eventItem == null)
                 return NotFound(new { Message = $"Событие с id {id} не найдено" });
-
             return Ok(eventItem);
         }
 
-        /// <summary>
-        /// POST /events — создать событие
-        /// </summary>
         [HttpPost]
-        [ProducesResponseType(typeof(Event), 201)]
-        [ProducesResponseType(400)]
         public IActionResult Create([FromBody] Event newEvent)
         {
-            // Валидация модели
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            // Дополнительная проверка EndAt > StartAt
             if (newEvent.EndAt <= newEvent.StartAt)
-            {
                 return BadRequest(new { Message = "EndAt должен быть позже StartAt" });
-            }
 
             _eventService.Add(newEvent);
-
             return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, newEvent);
         }
 
-        /// <summary>
-        /// PATCH /events/{id} — обновить событие (частично или полностью)
-        /// </summary>
-        [HttpPatch("{id}")]
-        [ProducesResponseType(200)]
-        [ProducesResponseType(400)]
-        [ProducesResponseType(404)]
-        public IActionResult Update(int id, [FromBody] UpdateEventRequest request)
+        [HttpPut("{id}")]
+        public IActionResult Update(int id, [FromBody] Event updatedEvent)
         {
-            if (request == null)
-                return BadRequest(new { Error = "Request body is required" });
+            if (id != updatedEvent.Id)
+                return BadRequest(new { Message = "Id в URL не совпадает с Id в теле запроса" });
 
-            // Получаем событие до обновления
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
             var existingEvent = _eventService.GetById(id);
             if (existingEvent == null)
                 return NotFound(new { Message = $"Событие с id {id} не найдено" });
 
-            // Сохраняем старые значения для отслеживания изменений
-            var updatedFields = new List<string>();
-
-            // Обновляем поля
-            if (request.Title != null)
-            {
-                existingEvent.Title = request.Title;
-                updatedFields.Add("Title");
-            }
-
-            if (request.Description != null)
-            {
-                existingEvent.Description = request.Description;
-                updatedFields.Add("Description");
-            }
-
-            if (request.StartAt.HasValue)
-            {
-                existingEvent.StartAt = request.StartAt.Value;
-                updatedFields.Add("StartAt");
-            }
-
-            if (request.EndAt.HasValue)
-            {
-                existingEvent.EndAt = request.EndAt.Value;
-                updatedFields.Add("EndAt");
-            }
-
-            // Проверка EndAt > StartAt
-            if (existingEvent.EndAt <= existingEvent.StartAt)
-            {
+            if (updatedEvent.EndAt <= updatedEvent.StartAt)
                 return BadRequest(new { Message = "EndAt должен быть позже StartAt" });
-            }
 
-            // Вызываем сервис для сохранения изменений
-            _eventService.Update(id, request);
-
-            // Выводим информацию в консоль (для отладки)
-            Console.WriteLine($"Обновлено событие с Id {id}");
-            Console.WriteLine($"Изменённые поля: {string.Join(", ", updatedFields)}");
-            Console.WriteLine($"Текущее состояние: Title = {existingEvent.Title}, StartAt = {existingEvent.StartAt}, EndAt = {existingEvent.EndAt}");
-
-            // Возвращаем обновлённое событие + информацию о том, что изменилось
-            return Ok(new
-            {
-                Message = "Событие успешно обновлено",
-                UpdatedFields = updatedFields,
-                Event = existingEvent
-            });
+            _eventService.Update(id, updatedEvent);
+            return Ok(_eventService.GetById(id));
         }
 
-        /// <summary>
-        /// DELETE /events/{id} — удалить событие
-        /// </summary>
         [HttpDelete("{id}")]
-        [ProducesResponseType(204)]
-        [ProducesResponseType(404)]
         public IActionResult Delete(int id)
         {
             var existingEvent = _eventService.GetById(id);

@@ -8,6 +8,6 @@ namespace events_api.Interfaces
         List<Event> GetAll();
         void Add(Event eventItem);
         void Delete(int id);
-        void Update(int id, UpdateEventRequest request);
-        }
+        void Update(int id, Event updatedEvent);
+    }
 }
