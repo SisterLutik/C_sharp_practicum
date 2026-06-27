@@ -31,17 +31,28 @@ namespace events_api.Controllers
         }
 
         [HttpPost]
-        public IActionResult Create([FromBody] Event newEvent)
+        public IActionResult Create([FromBody] CreateEventRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            if (newEvent.EndAt <= newEvent.StartAt)
+            if (request.EndAt <= request.StartAt)
                 return BadRequest(new { Message = "EndAt должен быть позже StartAt" });
 
-            _eventService.Add(newEvent);
+            // Маппинг DTO → модель
+            var newEvent = new Event
+            {
+                Title = request.Title,
+                Description = request.Description,
+                StartAt = request.StartAt,
+                EndAt = request.EndAt
+            };
+
+            _eventService.Add(newEvent); // Id генерируется внутри сервиса
+
             return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, newEvent);
         }
+
 
         [HttpPut("{id}")]
         public IActionResult Update(int id, [FromBody] Event updatedEvent)

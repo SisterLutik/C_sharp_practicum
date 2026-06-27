@@ -45,14 +45,25 @@ namespace events_api.Services
 
         public void Update(int id, Event updatedEvent)
         {
-            var existingEvent = GetById(id);
-            if (existingEvent == null) return;
+            var eventItem = GetById(id);
+            if (eventItem == null)
+            {
+                Console.WriteLine($"Событие #{id} не найдено");
+                return;
+            }
 
-            existingEvent.Title = updatedEvent.Title;
-            existingEvent.Description = updatedEvent.Description;
-            existingEvent.StartAt = updatedEvent.StartAt;
-            existingEvent.EndAt = updatedEvent.EndAt;
+            // Все поля обязательны
+            eventItem.Title = updatedEvent.Title;
+            eventItem.Description = updatedEvent.Description;
+            eventItem.StartAt = updatedEvent.StartAt;
+            eventItem.EndAt = updatedEvent.EndAt;
+
+            if (eventItem.EndAt < eventItem.StartAt)
+                throw new InvalidOperationException("EndAt не может быть меньше StartAt");
+
+            Console.WriteLine($"Событие #{eventItem.Id} успешно обновлено");
         }
+
 
         public void Delete(int id)
         {

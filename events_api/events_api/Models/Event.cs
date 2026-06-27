@@ -5,7 +5,6 @@ namespace events_api.Models
 {
     public class Event : IValidatableObject
     {
-        [Required]
         public int Id { get; set; }
 
         [Required(ErrorMessage = "Title обязателен")]
