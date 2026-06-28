@@ -15,20 +15,39 @@ namespace events_api.Controllers
             _eventService = eventService;
         }
 
+        /// <summary>
+        /// GET /events — получить список всех событий с фильтрацией и пагинацией
+        /// </summary>
         [HttpGet]
+        [ProducesResponseType(typeof(PaginatedResult<Event>), 200)]
+        [ProducesResponseType(400)]
         public IActionResult GetAll(
             [FromQuery] string? title,
             [FromQuery] DateTime? from,
-            [FromQuery] DateTime? to)
+            [FromQuery] DateTime? to,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
-            // Дополнительная проверка: from не должен быть позже to
+            // Проверка: page не может быть меньше 1
+            if (page < 1)
+            {
+                return BadRequest(new { Message = "Page должен быть больше или равен 1" });
+            }
+
+            // Проверка: pageSize не может быть меньше 1
+            if (pageSize < 1)
+            {
+                return BadRequest(new { Message = "PageSize должен быть больше или равен 1" });
+            }
+
+            // Проверка: from не позже to
             if (from.HasValue && to.HasValue && from > to)
             {
                 return BadRequest(new { Message = "Дата начала (from) не может быть позже даты окончания (to)" });
             }
 
-            var events = _eventService.GetAll(title, from, to);
-            return Ok(events);
+            var result = _eventService.GetAll(title, from, to, page, pageSize);
+            return Ok(result);
         }
 
 

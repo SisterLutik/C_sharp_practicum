@@ -32,29 +32,47 @@ namespace events_api.Services
             return _events.FirstOrDefault(e => e.Id == id);
         }
 
-        public List<Event> GetAll(string? title, DateTime? from, DateTime? to)
+        public PaginatedResult<Event> GetAll(
+                string? title,
+                DateTime? from,
+                DateTime? to,
+                int page,
+                int pageSize)
         {
             var query = _events.AsQueryable();
 
-            // Фильтр по названию (регистронезависимый, частичное совпадение)
+            // Фильтр по названию
             if (!string.IsNullOrWhiteSpace(title))
             {
                 query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
             }
 
-            // Фильтр по дате начала (не раньше указанной даты)
+            // Фильтр по дате начала
             if (from.HasValue)
             {
                 query = query.Where(e => e.StartAt >= from.Value);
             }
 
-            // Фильтр по дате окончания (не позже указанной даты)
+            // Фильтр по дате окончания
             if (to.HasValue)
             {
                 query = query.Where(e => e.EndAt <= to.Value);
             }
 
-            return query.ToList();
+            var totalCount = query.Count();
+
+            var items = query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return new PaginatedResult<Event>
+            {
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                Items = items
+            };
         }
 
         public void Add(Event eventItem)
