@@ -32,9 +32,29 @@ namespace events_api.Services
             return _events.FirstOrDefault(e => e.Id == id);
         }
 
-        public List<Event> GetAll()
+        public List<Event> GetAll(string? title, DateTime? from, DateTime? to)
         {
-            return _events;
+            var query = _events.AsQueryable();
+
+            // Фильтр по названию (регистронезависимый, частичное совпадение)
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Фильтр по дате начала (не раньше указанной даты)
+            if (from.HasValue)
+            {
+                query = query.Where(e => e.StartAt >= from.Value);
+            }
+
+            // Фильтр по дате окончания (не позже указанной даты)
+            if (to.HasValue)
+            {
+                query = query.Where(e => e.EndAt <= to.Value);
+            }
+
+            return query.ToList();
         }
 
         public void Add(Event eventItem)

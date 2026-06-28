@@ -16,10 +16,21 @@ namespace events_api.Controllers
         }
 
         [HttpGet]
-        public IActionResult GetAll()
+        public IActionResult GetAll(
+            [FromQuery] string? title,
+            [FromQuery] DateTime? from,
+            [FromQuery] DateTime? to)
         {
-            return Ok(_eventService.GetAll());
+            // Дополнительная проверка: from не должен быть позже to
+            if (from.HasValue && to.HasValue && from > to)
+            {
+                return BadRequest(new { Message = "Дата начала (from) не может быть позже даты окончания (to)" });
+            }
+
+            var events = _eventService.GetAll(title, from, to);
+            return Ok(events);
         }
+
 
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
