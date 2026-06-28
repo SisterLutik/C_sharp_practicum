@@ -1,4 +1,5 @@
 using events_api.Interfaces;
+using events_api.Middleware;
 using events_api.Services;
 using Microsoft.OpenApi;
 
@@ -19,6 +20,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
