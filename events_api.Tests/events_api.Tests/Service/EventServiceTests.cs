@@ -147,8 +147,7 @@ namespace events_api.Tests.Services
 
             // Assert
             result.Items.Should().NotBeEmpty();
-            result.Items.Should().AllSatisfy(e =>
-                e.Title.Contains("уникальное", StringComparison.OrdinalIgnoreCase));
+            result.Items.Should().AllSatisfy(e => e.Title.Should().ContainEquivalentOf("уникальное"));
         }
 
         [Fact]
@@ -224,7 +223,7 @@ namespace events_api.Tests.Services
             // Assert
             result.Items.Should().AllSatisfy(e =>
             {
-                e.Title.Should().Contain("конференция", StringComparison.OrdinalIgnoreCase);
+                e.Title.Should().ContainEquivalentOf("конференция");
                 e.StartAt.Should().BeOnOrAfter(DateTime.Now.AddDays(1));
                 e.EndAt.Should().BeOnOrBefore(DateTime.Now.AddDays(3));
             });
@@ -235,19 +234,44 @@ namespace events_api.Tests.Services
         // =============================================
 
         [Fact]
+        public void Update_WithInvalidDates_WhenEndAtBeforeStartAt_ShouldThrowInvalidOperationException()
+        {
+            // Arrange
+            var newEvent = new Event
+            {
+                Title = "Событие с корректными датами",
+                Description = "Описание",
+                StartAt = DateTime.Now.AddDays(1),
+                EndAt = DateTime.Now.AddDays(2)
+            };
+            _service.Add(newEvent);
+
+            var invalidEvent = new Event
+            {
+                Title = "Некорректное событие",
+                Description = "Описание",
+                StartAt = DateTime.Now.AddDays(3),
+                EndAt = DateTime.Now.AddDays(2) // EndAt раньше StartAt
+            };
+
+            // Act & Assert
+            var exception = Record.Exception(() => _service.Update(newEvent.Id, invalidEvent));
+
+            exception.Should().NotBeNull();
+            exception.Should().BeOfType<InvalidOperationException>();
+            exception!.Message.Should().Be("EndAt не может быть меньше StartAt");
+        }
+
+        [Fact]
         public void GetById_WithNonExistingId_ShouldReturnNull()
         {
-            // Act
             var result = _service.GetById(99999);
-
-            // Assert
             result.Should().BeNull();
         }
 
         [Fact]
         public void Update_WithNonExistingId_ShouldDoNothing()
         {
-            // Arrange
             var updatedEvent = new Event
             {
                 Title = "Новое название",
@@ -256,44 +280,14 @@ namespace events_api.Tests.Services
                 EndAt = DateTime.Now.AddDays(2)
             };
 
-            // Act
             _service.Update(99999, updatedEvent);
-
-            // Assert
-            // Ничего не должно произойти, исключение не должно быть выброшено
             true.Should().BeTrue();
-        }
-
-        [Fact]
-        public void Create_ShouldRejectEvent_WhenEndAtIsBeforeStartAt()
-        {
-            // Arrange
-            var newEvent = new Event
-            {
-                Title = "Некорректное событие",
-                Description = "Описание",
-                StartAt = DateTime.Now.AddDays(2),
-                EndAt = DateTime.Now.AddDays(1) // EndAt раньше StartAt
-            };
-
-            // Act
-            // В текущей реализации сервис не валидирует даты при создании
-            // Проверяем, что событие создаётся с некорректными датами
-            _service.Add(newEvent);
-            var result = _service.GetById(newEvent.Id);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.EndAt.Should().BeBefore(result.StartAt);
         }
 
         [Fact]
         public void Delete_WithNonExistingId_ShouldDoNothing()
         {
-            // Act
             var exception = Record.Exception(() => _service.Delete(99999));
-
-            // Assert
             exception.Should().BeNull();
         }
     }
