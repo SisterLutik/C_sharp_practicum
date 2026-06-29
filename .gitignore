@@ -9,8 +9,9 @@
 *.vssscc
 *.vspscc
 /events_api/.vs
+/events_api/events_api/.vs
 events_api/events_api/events_api.Tests/bin
 events_api/events_api/events_api.Tests/obj
 events_api/events_api/events_api.Tests/events_api.Tests/bin
 events_api/events_api/events_api.Tests/events_api.Tests/obj
-events_api/events_api/events_api.Tests/vs
+events_api/events_api/events_api.Tests/.vs
