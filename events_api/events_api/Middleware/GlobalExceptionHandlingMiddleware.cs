@@ -54,12 +54,13 @@ namespace events_api.Middleware
         }
 
         private static int MapStatusCode(Exception ex)
-            => ex switch
-            {
-                ArgumentException => StatusCodes.Status400BadRequest,
-                InvalidOperationException => StatusCodes.Status400BadRequest,
-                KeyNotFoundException => StatusCodes.Status404NotFound,
-                _ => StatusCodes.Status500InternalServerError
-            };
+     => ex switch
+     {
+         BusinessException businessEx => businessEx.StatusCode,
+         ArgumentException => StatusCodes.Status400BadRequest,
+         InvalidOperationException => StatusCodes.Status400BadRequest,
+         KeyNotFoundException => StatusCodes.Status404NotFound,
+         _ => StatusCodes.Status500InternalServerError
+     };
     }
 }

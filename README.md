@@ -4,31 +4,31 @@ API для управления событиями. Поддерживает п�
 
 ## Требования
 
-- .NET 8.0 или выше
+- .NET 10.0 (Preview) или выше
 - Любая ОС (Windows, Linux, macOS)
 
 ## Запуск проекта
 
 1. Восстановите зависимости:
-```bash
+bash
 dotnet restore
-```
+
 
 2. Запустите приложение:
-```bash
+bash
 dotnet run
-```
+
 
 3. Откройте Swagger UI:
-```
+
 https://localhost:5286/swagger
-```
+
 
 ## Запуск тестов
 
-```bash
+bash
 dotnet test
-```
+
 
 ## Эндпоинты
 
@@ -52,7 +52,7 @@ dotnet test
 
 ## Формат ответа (GET /api/events)
 
-```json
+json
 {
     "page": 2,
     "pageSize": 5,
@@ -68,7 +68,7 @@ dotnet test
         }
     ]
 }
-```
+
 
 ## Примеры запросов
 
@@ -90,7 +90,7 @@ dotnet test
 ### GET /api/events/1
 
 **Ответ:**
-```json
+json
 {
     "id": 1,
     "title": "Интенсив по ловле жуков",
@@ -98,22 +98,22 @@ dotnet test
     "startAt": "2025-06-12T10:00:00",
     "endAt": "2025-06-14T18:00:00"
 }
-```
+
 
 ### POST /api/events
 
 **Запрос:**
-```json
+json
 {
     "title": "Новая конференция",
     "description": "Описание конференции",
     "startAt": "2025-07-01T10:00:00",
     "endAt": "2025-07-01T18:00:00"
 }
-```
+
 
 **Ответ (201 Created):**
-```json
+json
 {
     "id": 3,
     "title": "Новая конференция",
@@ -121,12 +121,12 @@ dotnet test
     "startAt": "2025-07-01T10:00:00",
     "endAt": "2025-07-01T18:00:00"
 }
-```
+
 
 ### PUT /api/events/1
 
 **Запрос:**
-```json
+json
 {
     "id": 1,
     "title": "Обновлённое название",
@@ -134,10 +134,10 @@ dotnet test
     "startAt": "2025-08-01T10:00:00",
     "endAt": "2025-08-01T20:00:00"
 }
-```
+
 
 **Ответ (200 OK):**
-```json
+json
 {
     "id": 1,
     "title": "Обновлённое название",
@@ -145,7 +145,7 @@ dotnet test
     "startAt": "2025-08-01T10:00:00",
     "endAt": "2025-08-01T20:00:00"
 }
-```
+
 
 ### DELETE /api/events/1
 
@@ -156,28 +156,28 @@ dotnet test
 При возникновении ошибки API возвращает JSON-ответ в формате Problem Details (RFC 7807):
 
 **Пример ошибки валидации (400 Bad Request):**
-```json
+json
 {
     "status": 400,
     "detail": "EndAt должен быть позже StartAt"
 }
-```
+
 
 **Пример ошибки "не найдено" (404 Not Found):**
-```json
+json
 {
     "status": 404,
     "detail": "Событие с id 999 не найдено"
 }
-```
+
 
 **Пример внутренней ошибки (500 Internal Server Error):**
-```json
+json
 {
     "status": 500,
     "detail": "Произошла непредвиденная ошибка. Попробуйте позже."
 }
-```
+
 
 ## Коды ответов
 
@@ -200,7 +200,7 @@ dotnet test
 
 ## Технологии
 
-- ASP.NET Core 8.0
+- ASP.NET Core 10.0 (Preview)
 - Swagger / OpenAPI
 - xUnit (тесты)
-- C# 12.0
+- C# 13.0

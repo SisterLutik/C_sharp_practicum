@@ -64,12 +64,11 @@ namespace events_api.Controllers
         public IActionResult Create([FromBody] CreateEventRequest request)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                throw new BusinessException("Ошибка валидации модели", 400);
 
             if (request.EndAt <= request.StartAt)
-                return BadRequest(new { Message = "EndAt должен быть позже StartAt" });
+                throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
-            // Маппинг DTO → модель
             var newEvent = new Event
             {
                 Title = request.Title,
@@ -78,41 +77,28 @@ namespace events_api.Controllers
                 EndAt = request.EndAt
             };
 
-            _eventService.Add(newEvent); // Id генерируется внутри сервиса
-
+            _eventService.Add(newEvent);
             return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, newEvent);
         }
-
 
         [HttpPut("{id}")]
         public IActionResult Update(int id, [FromBody] Event updatedEvent)
         {
             if (id != updatedEvent.Id)
-                return BadRequest(new { Message = "Id в URL не совпадает с Id в теле запроса" });
+                throw new BusinessException("Id в URL не совпадает с Id в теле запроса", 400);
 
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                throw new BusinessException("Ошибка валидации модели", 400);
 
             var existingEvent = _eventService.GetById(id);
             if (existingEvent == null)
-                return NotFound(new { Message = $"Событие с id {id} не найдено" });
+                throw new BusinessException($"Событие с id {id} не найдено", 404);
 
             if (updatedEvent.EndAt <= updatedEvent.StartAt)
-                return BadRequest(new { Message = "EndAt должен быть позже StartAt" });
+                throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
             _eventService.Update(id, updatedEvent);
             return Ok(_eventService.GetById(id));
-        }
-
-        [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
-        {
-            var existingEvent = _eventService.GetById(id);
-            if (existingEvent == null)
-                return NotFound(new { Message = $"Событие с id {id} не найдено" });
-
-            _eventService.Delete(id);
-            return NoContent();
         }
     }
 }
