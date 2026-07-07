@@ -10,5 +10,6 @@ namespace events_api.Interfaces
         void Update(Booking booking);
         void Delete(Guid id);
         List<Booking> GetByEventId(int eventId);
+        List<Booking> GetByStatus(BookingStatus status);
     }
 }

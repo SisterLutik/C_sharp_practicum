@@ -1,7 +1,7 @@
 ﻿using events_api.Interfaces;
 using events_api.Models;
 
-namespace events_api.Services
+namespace events_api.Data
 {
     public class BookingRepository : IBookingRepository
     {
@@ -41,13 +41,8 @@ namespace events_api.Services
 
         public void Add(Booking booking)
         {
-            // ✅ Уникальный Id (Guid.NewGuid())
             booking.Id = Guid.NewGuid();
-
-            // ✅ Текущая дата в CreatedAt
             booking.CreatedAt = DateTime.UtcNow;
-
-            // ✅ Статус Pending при создании
             booking.Status = BookingStatus.Pending;
 
             _bookings.Add(booking);
@@ -63,10 +58,8 @@ namespace events_api.Services
                 return;
             }
 
-            // Обновляем статус
             existingBooking.Status = booking.Status;
 
-            // Если статус изменился на Confirmed или Rejected — заполняем ProcessedAt
             if (booking.Status == BookingStatus.Confirmed || booking.Status == BookingStatus.Rejected)
             {
                 existingBooking.ProcessedAt = DateTime.UtcNow;
@@ -93,6 +86,12 @@ namespace events_api.Services
         {
             Console.WriteLine($"[BookingRepository] Получение броней для события #{eventId}");
             return _bookings.Where(b => b.EventId == eventId).ToList();
+        }
+
+        public List<Booking> GetByStatus(BookingStatus status)
+        {
+            Console.WriteLine($"[BookingRepository] Получение броней со статусом {status}");
+            return _bookings.Where(b => b.Status == status).ToList();
         }
     }
 }

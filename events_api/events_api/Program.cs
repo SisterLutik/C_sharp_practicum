@@ -1,3 +1,4 @@
+using events_api.Data;
 using events_api.Interfaces;
 using events_api.Middleware;
 using events_api.Services;
@@ -8,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddSingleton<IEventService, EventService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddHostedService<BookingBackgroundService>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 
 builder.Services.AddEndpointsApiExplorer();
