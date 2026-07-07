@@ -1,5 +1,4 @@
 ﻿using events_api.events_api.Exceptions;
-using events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
 using Microsoft.AspNetCore.Mvc;

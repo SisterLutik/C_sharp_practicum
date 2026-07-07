@@ -1,6 +1,7 @@
 using events_api.events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
+using events_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace events_api.Controllers
@@ -10,10 +11,13 @@ namespace events_api.Controllers
     public class EventsController : ControllerBase
     {
         private readonly IEventService _eventService;
+        private readonly IBookingService _bookingService;
 
-        public EventsController(IEventService eventService)
+        public EventsController(IEventService eventService, IBookingService bookingService)
         {
             _eventService = eventService;
+            _bookingService = bookingService;
+
         }
 
         [HttpGet]
@@ -99,5 +103,26 @@ namespace events_api.Controllers
             _eventService.Delete(id);
             return NoContent();
         }
+        [HttpPost("{id}/book")]
+        [ProducesResponseType(typeof(Booking), 202)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(400)]
+        public async Task<IActionResult> CreateBooking(int id)
+        {
+            // Проверяем, существует ли событие
+            var eventExists = _eventService.GetById(id);
+            if (eventExists == null)
+                throw new BusinessException($"Событие с id {id} не найдено", 404);
+
+            // Создаём бронь
+            var booking = await _bookingService.CreateBookingAsync(id);
+
+            // Возвращаем 202 Accepted с телом и Location
+            return Accepted(
+                new Uri($"/api/bookings/{booking.Id}", UriKind.Relative),
+                booking
+            );
+        }
+
     }
 }

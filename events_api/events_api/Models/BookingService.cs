@@ -1,5 +1,4 @@
 ﻿using events_api.events_api.Exceptions;
-using events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
 
@@ -8,11 +7,11 @@ namespace events_api.Services
     public class BookingService : IBookingService
     {
         private readonly IBookingRepository _bookingRepository;
-        private readonly IEventRepository _eventRepository;
+        private readonly IEventService _eventRepository;
 
         public BookingService(
             IBookingRepository bookingRepository,
-            IEventRepository eventRepository)
+            IEventService eventRepository)
         {
             _bookingRepository = bookingRepository;
             _eventRepository = eventRepository;
