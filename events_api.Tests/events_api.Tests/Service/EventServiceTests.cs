@@ -21,7 +21,6 @@ namespace events_api.Tests.Services
         [Fact]
         public void Add_ShouldCreateNewEvent_WithGeneratedId()
         {
-            // Arrange
             var newEvent = new Event
             {
                 Title = "Новое событие",
@@ -30,11 +29,9 @@ namespace events_api.Tests.Services
                 EndAt = DateTime.Now.AddDays(2)
             };
 
-            // Act
             _service.Add(newEvent);
             var result = _service.GetById(newEvent.Id);
 
-            // Assert
             result.Should().NotBeNull();
             result!.Id.Should().BeGreaterThan(0);
             result.Title.Should().Be("Новое событие");
@@ -43,13 +40,10 @@ namespace events_api.Tests.Services
         [Fact]
         public void GetAll_ShouldReturnAllEvents()
         {
-            // Arrange
             var initialCount = _service.GetAll(null, null, null, 1, 10).Items.Count;
 
-            // Act
             var result = _service.GetAll(null, null, null, 1, 100);
 
-            // Assert
             result.Items.Should().NotBeNull();
             result.TotalCount.Should().Be(initialCount);
         }
@@ -57,7 +51,6 @@ namespace events_api.Tests.Services
         [Fact]
         public void GetById_WithExistingId_ShouldReturnEvent()
         {
-            // Arrange
             var newEvent = new Event
             {
                 Title = "Тестовое событие",
@@ -67,10 +60,8 @@ namespace events_api.Tests.Services
             };
             _service.Add(newEvent);
 
-            // Act
             var result = _service.GetById(newEvent.Id);
 
-            // Assert
             result.Should().NotBeNull();
             result!.Id.Should().Be(newEvent.Id);
             result.Title.Should().Be("Тестовое событие");
@@ -79,7 +70,6 @@ namespace events_api.Tests.Services
         [Fact]
         public void Update_WithExistingId_ShouldUpdateEvent()
         {
-            // Arrange
             var newEvent = new Event
             {
                 Title = "Старое название",
@@ -97,11 +87,9 @@ namespace events_api.Tests.Services
                 EndAt = DateTime.Now.AddDays(4)
             };
 
-            // Act
             _service.Update(newEvent.Id, updatedEvent);
             var result = _service.GetById(newEvent.Id);
 
-            // Assert
             result.Should().NotBeNull();
             result!.Title.Should().Be("Новое название");
             result.Description.Should().Be("Новое описание");
@@ -112,7 +100,6 @@ namespace events_api.Tests.Services
         [Fact]
         public void Delete_WithExistingId_ShouldRemoveEvent()
         {
-            // Arrange
             var newEvent = new Event
             {
                 Title = "Событие для удаления",
@@ -122,18 +109,15 @@ namespace events_api.Tests.Services
             };
             _service.Add(newEvent);
 
-            // Act
             _service.Delete(newEvent.Id);
             var result = _service.GetById(newEvent.Id);
 
-            // Assert
             result.Should().BeNull();
         }
 
         [Fact]
         public void GetAll_WithTitleFilter_ShouldReturnMatchingEvents()
         {
-            // Arrange
             _service.Add(new Event
             {
                 Title = "Уникальное название",
@@ -142,10 +126,8 @@ namespace events_api.Tests.Services
                 EndAt = DateTime.Now.AddDays(2)
             });
 
-            // Act
             var result = _service.GetAll("уникальное", null, null, 1, 10);
 
-            // Assert
             result.Items.Should().NotBeEmpty();
             result.Items.Should().AllSatisfy(e => e.Title.Should().ContainEquivalentOf("уникальное"));
         }
@@ -154,24 +136,43 @@ namespace events_api.Tests.Services
         public void GetAll_WithDateFilters_ShouldReturnEventsInRange()
         {
             // Arrange
-            var from = DateTime.Now.AddDays(-10);
-            var to = DateTime.Now.AddDays(-5);
+            var fixedDate = new DateTime(2025, 7, 15, 12, 0, 0);
+
+            _service.Add(new Event
+            {
+                Title = "Событие в диапазоне",
+                Description = "Описание",
+                StartAt = fixedDate.AddDays(-5),
+                EndAt = fixedDate.AddDays(5)
+            });
+            _service.Add(new Event
+            {
+                Title = "Событие вне диапазона",
+                Description = "Описание",
+                StartAt = fixedDate.AddDays(-20),
+                EndAt = fixedDate.AddDays(-15)
+            });
+
+            var from = fixedDate.AddDays(-10);
+            var to = fixedDate.AddDays(10);
 
             // Act
             var result = _service.GetAll(null, from, to, 1, 10);
 
             // Assert
+            result.Items.Should().NotBeEmpty();
             result.Items.Should().AllSatisfy(e =>
             {
                 e.StartAt.Should().BeOnOrAfter(from);
                 e.EndAt.Should().BeOnOrBefore(to);
             });
+            result.Items.Should().Contain(e => e.Title == "Событие в диапазоне");
+            result.Items.Should().NotContain(e => e.Title == "Событие вне диапазона");
         }
 
         [Fact]
         public void GetAll_WithPagination_ShouldReturnCorrectPage()
         {
-            // Arrange
             for (int i = 0; i < 25; i++)
             {
                 _service.Add(new Event
@@ -183,10 +184,8 @@ namespace events_api.Tests.Services
                 });
             }
 
-            // Act
             var result = _service.GetAll(null, null, null, 2, 10);
 
-            // Assert
             result.Page.Should().Be(2);
             result.PageSize.Should().Be(10);
             result.Items.Count.Should().Be(10);
@@ -197,26 +196,35 @@ namespace events_api.Tests.Services
         public void GetAll_WithCombinedFilters_ShouldApplyAllFilters()
         {
             // Arrange
+            var fixedDate = new DateTime(2025, 7, 15, 12, 0, 0);
+
             _service.Add(new Event
             {
                 Title = "Конференция по IT",
                 Description = "Описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2)
+                StartAt = fixedDate.AddDays(1),
+                EndAt = fixedDate.AddDays(2)
             });
             _service.Add(new Event
             {
                 Title = "Конференция по дизайну",
                 Description = "Описание",
-                StartAt = DateTime.Now.AddDays(3),
-                EndAt = DateTime.Now.AddDays(4)
+                StartAt = fixedDate.AddDays(3),
+                EndAt = fixedDate.AddDays(4)
+            });
+            _service.Add(new Event
+            {
+                Title = "Событие вне диапазона",
+                Description = "Описание",
+                StartAt = fixedDate.AddDays(20),
+                EndAt = fixedDate.AddDays(25)
             });
 
             // Act
             var result = _service.GetAll(
                 title: "конференция",
-                from: DateTime.Now.AddDays(1),
-                to: DateTime.Now.AddDays(3),
+                from: fixedDate.AddDays(0),
+                to: fixedDate.AddDays(5),
                 page: 1,
                 pageSize: 10);
 
@@ -224,9 +232,13 @@ namespace events_api.Tests.Services
             result.Items.Should().AllSatisfy(e =>
             {
                 e.Title.Should().ContainEquivalentOf("конференция");
-                e.StartAt.Should().BeOnOrAfter(DateTime.Now.AddDays(1));
-                e.EndAt.Should().BeOnOrBefore(DateTime.Now.AddDays(3));
+                e.StartAt.Should().BeOnOrAfter(fixedDate.AddDays(0));
+                e.EndAt.Should().BeOnOrBefore(fixedDate.AddDays(5));
             });
+            result.Items.Count.Should().Be(2);
+            result.Items.Should().Contain(e => e.Title == "Конференция по IT");
+            result.Items.Should().Contain(e => e.Title == "Конференция по дизайну");
+            result.Items.Should().NotContain(e => e.Title == "Событие вне диапазона");
         }
 
         // =============================================
@@ -236,7 +248,6 @@ namespace events_api.Tests.Services
         [Fact]
         public void Update_WithInvalidDates_WhenEndAtBeforeStartAt_ShouldThrowInvalidOperationException()
         {
-            // Arrange
             var newEvent = new Event
             {
                 Title = "Событие с корректными датами",
@@ -251,10 +262,9 @@ namespace events_api.Tests.Services
                 Title = "Некорректное событие",
                 Description = "Описание",
                 StartAt = DateTime.Now.AddDays(3),
-                EndAt = DateTime.Now.AddDays(2) // EndAt раньше StartAt
+                EndAt = DateTime.Now.AddDays(2)
             };
 
-            // Act & Assert
             var exception = Record.Exception(() => _service.Update(newEvent.Id, invalidEvent));
 
             exception.Should().NotBeNull();
