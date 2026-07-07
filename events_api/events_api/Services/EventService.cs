@@ -12,7 +12,7 @@ namespace events_api.Services
         {
             _events.Add(new Event
             {
-                Id = 1,
+                Id = Guid.NewGuid(),        
                 Title = "Интенсив по ловле жуков",
                 Description = "Увлекательный аттракцион",
                 StartAt = DateTime.Now.AddDays(-2),
@@ -20,7 +20,7 @@ namespace events_api.Services
             });
             _events.Add(new Event
             {
-                Id = 2,
+                Id = Guid.NewGuid(), 
                 Title = "Мозговая вечеринка",
                 Description = "Думаем сразу много мыслей",
                 StartAt = DateTime.Now.AddDays(3),
@@ -28,7 +28,7 @@ namespace events_api.Services
             });
         }
 
-        public Event? GetById(int id)
+        public Event? GetById(Guid id)
         {
             return _events.FirstOrDefault(e => e.Id == id);
         }
@@ -64,11 +64,11 @@ namespace events_api.Services
 
         public void Add(Event eventItem)
         {
-            eventItem.Id = _events.Any() ? _events.Max(e => e.Id) + 1 : 1;
+            eventItem.Id = Guid.NewGuid();  
             _events.Add(eventItem);
         }
 
-        public void Update(int id, Event updatedEvent)
+        public void Update(Guid id, Event updatedEvent)
         {
             var existingEvent = GetById(id);
 
@@ -85,7 +85,7 @@ namespace events_api.Services
                 throw new BusinessException("EndAt должен быть позже StartAt", 400);
         }
 
-        public void Delete(int id)
+        public void Delete(Guid id)
         {
             var eventItem = GetById(id);
             if (eventItem == null)

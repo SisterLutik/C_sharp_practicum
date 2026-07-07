@@ -3,17 +3,20 @@ using events_api.Models;
 
 namespace events_api.Data
 {
-    public class BookingRepository : IBookingRepository
+     public class BookingRepository : IBookingRepository
     {
         private readonly List<Booking> _bookings = new();
+        private readonly ILogger<BookingRepository> _logger;
 
-        public BookingRepository()
+
+        public BookingRepository(ILogger<BookingRepository> logger)
         {
+            _logger = logger;
             // Имитация начальных данных
             _bookings.Add(new Booking
             {
                 Id = Guid.NewGuid(),
-                EventId = 1,
+                EventId = Guid.NewGuid(),
                 Status = BookingStatus.Confirmed,
                 CreatedAt = DateTime.UtcNow.AddDays(-5),
                 ProcessedAt = DateTime.UtcNow.AddDays(-4)
@@ -21,7 +24,7 @@ namespace events_api.Data
             _bookings.Add(new Booking
             {
                 Id = Guid.NewGuid(),
-                EventId = 1,
+                EventId = Guid.NewGuid(),
                 Status = BookingStatus.Pending,
                 CreatedAt = DateTime.UtcNow.AddDays(-2)
             });
@@ -29,13 +32,13 @@ namespace events_api.Data
 
         public Booking? GetById(Guid id)
         {
-            Console.WriteLine($"[BookingRepository] Получение брони #{id}");
+            _logger.LogInformation($"[BookingRepository] Получение брони #{id}");
             return _bookings.FirstOrDefault(b => b.Id == id);
         }
 
         public List<Booking> GetAll()
         {
-            Console.WriteLine("[BookingRepository] Получение всех броней");
+            _logger.LogInformation($"[BookingRepository] Получение всех броней");
             return _bookings;
         }
 
@@ -46,7 +49,7 @@ namespace events_api.Data
             booking.Status = BookingStatus.Pending;
 
             _bookings.Add(booking);
-            Console.WriteLine($"[BookingRepository] Бронь #{booking.Id} добавлена со статусом Pending");
+            _logger.LogInformation($"Бронь #{booking.Id} добавлена со статусом Pending");
         }
 
         public void Update(Booking booking)
@@ -54,7 +57,7 @@ namespace events_api.Data
             var existingBooking = GetById(booking.Id);
             if (existingBooking == null)
             {
-                Console.WriteLine($"[BookingRepository] Бронь #{booking.Id} не найдена");
+                _logger.LogInformation($"[BookingRepository] Бронь #{booking.Id} не найдена");
                 return;
             }
 
@@ -64,8 +67,7 @@ namespace events_api.Data
             {
                 existingBooking.ProcessedAt = DateTime.UtcNow;
             }
-
-            Console.WriteLine($"[BookingRepository] Бронь #{booking.Id} обновлена. Новый статус: {booking.Status}");
+            _logger.LogInformation($"[BookingRepository] Бронь #{booking.Id} обновлена. Новый статус: {booking.Status}");
         }
 
         public void Delete(Guid id)
@@ -74,23 +76,23 @@ namespace events_api.Data
             if (booking != null)
             {
                 _bookings.Remove(booking);
-                Console.WriteLine($"[BookingRepository] Бронь #{id} удалена");
+                _logger.LogInformation($"[BookingRepository] Бронь #{id} удалена");
             }
             else
             {
-                Console.WriteLine($"[BookingRepository] Бронь #{id} не найдена для удаления");
+                _logger.LogInformation($"[BookingRepository] Бронь #{id} не найдена для удаления");
             }
         }
 
-        public List<Booking> GetByEventId(int eventId)
+        public List<Booking> GetByEventId(Guid eventId)
         {
-            Console.WriteLine($"[BookingRepository] Получение броней для события #{eventId}");
+            _logger.LogInformation($"[BookingRepository] Получение броней для события #{eventId}");
             return _bookings.Where(b => b.EventId == eventId).ToList();
         }
 
         public List<Booking> GetByStatus(BookingStatus status)
         {
-            Console.WriteLine($"[BookingRepository] Получение броней со статусом {status}");
+            _logger.LogInformation($"[BookingRepository] Получение броней со статусом {status}");
             return _bookings.Where(b => b.Status == status).ToList();
         }
     }

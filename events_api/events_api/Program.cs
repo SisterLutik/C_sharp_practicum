@@ -10,7 +10,7 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<IEventService, EventService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddHostedService<BookingBackgroundService>();
-builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddSingleton<IBookingRepository, BookingRepository>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

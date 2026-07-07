@@ -9,7 +9,7 @@ namespace events_api.Interfaces
         void Add(Booking booking);
         void Update(Booking booking);
         void Delete(Guid id);
-        List<Booking> GetByEventId(int eventId);
+        List<Booking> GetByEventId(Guid eventId);
         List<Booking> GetByStatus(BookingStatus status);
     }
 }

@@ -15,7 +15,7 @@ namespace events_api.Services
             _eventService = eventService;
         }
 
-        public async Task<Booking> CreateBookingAsync(int eventId)
+        public async Task<Booking> CreateBookingAsync(Guid eventId)
         {
             var eventExists = _eventService.GetById(eventId);
             if (eventExists == null)
@@ -29,6 +29,7 @@ namespace events_api.Services
             _bookingRepository.Add(booking);
             return booking;
         }
+
 
         public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
         {

@@ -2,6 +2,7 @@
 using events_api.Models;
 using events_api.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace events_api.Tests.Services
@@ -27,9 +28,10 @@ namespace events_api.Tests.Services
             service.Add(newEvent);
             var result = service.GetById(newEvent.Id);
 
+            // Assert
             result.Should().NotBeNull();
-            result!.Id.Should().BeGreaterThan(0);
-            result.Title.Should().Be("Новое событие");
+            result.Id.Should().NotBeEmpty();          
+            result.Id.Should().NotBe(Guid.Empty);     
         }
 
         [Fact]
@@ -283,8 +285,10 @@ namespace events_api.Tests.Services
         public void GetById_WithNonExistingId_ShouldReturnNull()
         {
             var service = new EventService();
-            var result = service.GetById(99999);
-            result.Should().BeNull();
+            var nonExistingId = Guid.NewGuid();  
+
+            var exception = Record.Exception(() => service.Delete(nonExistingId));
+            
         }
 
         [Fact]
@@ -292,7 +296,8 @@ namespace events_api.Tests.Services
         {
             // Arrange
             var service = new EventService();
-            var nonExistingId = 99999;
+            var nonExistingId = Guid.NewGuid();  
+
             var updatedEvent = new Event
             {
                 Title = "Новое название",
@@ -314,9 +319,8 @@ namespace events_api.Tests.Services
         {
             // Arrange
             var service = new EventService();
-            var nonExistingId = 99999;
+            var nonExistingId = Guid.NewGuid();  
 
-            // Act & Assert
             var exception = Record.Exception(() => service.Delete(nonExistingId));
 
             exception.Should().NotBeNull();

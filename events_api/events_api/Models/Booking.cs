@@ -8,7 +8,7 @@ namespace events_api.Models
         public Guid Id { get; set; }
 
         [Required(ErrorMessage = "EventId обязателен")]
-        public int EventId { get; set; }
+        public Guid EventId { get; set; }
 
         [Required(ErrorMessage = "Status обязателен")]
         public BookingStatus Status { get; set; }

@@ -1,7 +1,6 @@
 using events_api.events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
-using events_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace events_api.Controllers
@@ -42,7 +41,7 @@ namespace events_api.Controllers
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetById(int id)
+        public IActionResult GetById(Guid id)
         {
             var eventItem = _eventService.GetById(id);
 
@@ -74,7 +73,7 @@ namespace events_api.Controllers
         }
 
         [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromBody] Event updatedEvent)
+        public IActionResult Update(Guid id, [FromBody] Event updatedEvent)
         {
             if (id != updatedEvent.Id)
                 throw new BusinessException("Id в URL не совпадает с Id в теле запроса", 400);
@@ -94,7 +93,7 @@ namespace events_api.Controllers
         }
 
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public IActionResult Delete(Guid id)
         {
             var existingEvent = _eventService.GetById(id);
             if (existingEvent == null)
@@ -104,10 +103,10 @@ namespace events_api.Controllers
             return NoContent();
         }
         [HttpPost("{id}/book")]
-        [ProducesResponseType(typeof(Booking), 202)]
+               [ProducesResponseType(typeof(Booking), 202)]
         [ProducesResponseType(404)]
         [ProducesResponseType(400)]
-        public async Task<IActionResult> CreateBooking(int id)
+        public async Task<IActionResult> CreateBooking(Guid id)
         {
             // Проверяем, существует ли событие
             var eventExists = _eventService.GetById(id);
