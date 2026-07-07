@@ -72,7 +72,6 @@ namespace events_api.Services
         {
             var existingEvent = GetById(id);
 
-            // ✅ Вместо Console.WriteLine выбрасываем исключение
             if (existingEvent == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
@@ -90,7 +89,6 @@ namespace events_api.Services
         {
             var eventItem = GetById(id);
 
-            // ✅ Вместо Console.WriteLine выбрасываем исключение
             if (eventItem == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
