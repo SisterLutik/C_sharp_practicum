@@ -1,6 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
+using events_api.events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace events_api.Controllers
 {
@@ -15,12 +16,7 @@ namespace events_api.Controllers
             _eventService = eventService;
         }
 
-        /// <summary>
-        /// GET /events — получить список всех событий с фильтрацией и пагинацией
-        /// </summary>
         [HttpGet]
-        [ProducesResponseType(typeof(PaginatedResult<Event>), 200)]
-        [ProducesResponseType(400)]
         public IActionResult GetAll(
             [FromQuery] string? title,
             [FromQuery] DateTime? from,
@@ -28,35 +24,27 @@ namespace events_api.Controllers
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10)
         {
-            // Проверка: page не может быть меньше 1
             if (page < 1)
-            {
-                return BadRequest(new { Message = "Page должен быть больше или равен 1" });
-            }
+                throw new BusinessException("Page должен быть больше или равен 1", 400);
 
-            // Проверка: pageSize не может быть меньше 1
             if (pageSize < 1)
-            {
-                return BadRequest(new { Message = "PageSize должен быть больше или равен 1" });
-            }
+                throw new BusinessException("PageSize должен быть больше или равен 1", 400);
 
-            // Проверка: from не позже to
             if (from.HasValue && to.HasValue && from > to)
-            {
-                return BadRequest(new { Message = "Дата начала (from) не может быть позже даты окончания (to)" });
-            }
+                throw new BusinessException("Дата начала (from) не может быть позже даты окончания (to)", 400);
 
             var result = _eventService.GetAll(title, from, to, page, pageSize);
             return Ok(result);
         }
 
-
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
         {
             var eventItem = _eventService.GetById(id);
+
             if (eventItem == null)
-                return NotFound(new { Message = $"Событие с id {id} не найдено" });
+                throw new BusinessException($"Событие с id {id} не найдено", 404);
+
             return Ok(eventItem);
         }
 
@@ -106,7 +94,7 @@ namespace events_api.Controllers
         {
             var existingEvent = _eventService.GetById(id);
             if (existingEvent == null)
-                return NotFound(new { Message = $"Событие с id {id} не найдено" });
+                throw new BusinessException($"Событие с id {id} не найдено", 404);
 
             _eventService.Delete(id);
             return NoContent();

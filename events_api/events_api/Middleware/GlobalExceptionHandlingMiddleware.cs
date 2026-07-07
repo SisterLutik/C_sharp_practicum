@@ -1,4 +1,5 @@
-﻿
+﻿using events_api.events_api.Exceptions;
+
 namespace events_api.Middleware
 {
     public class GlobalExceptionHandlingMiddleware
@@ -35,9 +36,7 @@ namespace events_api.Middleware
                 httpContext.Request.Path);
 
             if (httpContext.Response.HasStarted)
-            {
                 return;
-            }
 
             var statusCode = MapStatusCode(ex);
 
@@ -47,20 +46,20 @@ namespace events_api.Middleware
             var error = new
             {
                 Status = statusCode,
-                Detail = ex.Message,
-                           };
+                Detail = ex.Message
+            };
 
             await httpContext.Response.WriteAsJsonAsync(error);
         }
 
         private static int MapStatusCode(Exception ex)
-     => ex switch
-     {
-         BusinessException businessEx => businessEx.StatusCode,
-         ArgumentException => StatusCodes.Status400BadRequest,
-         InvalidOperationException => StatusCodes.Status400BadRequest,
-         KeyNotFoundException => StatusCodes.Status404NotFound,
-         _ => StatusCodes.Status500InternalServerError
-     };
+            => ex switch
+            {
+                BusinessException businessEx => businessEx.StatusCode,
+                ArgumentException => StatusCodes.Status400BadRequest,
+                InvalidOperationException => StatusCodes.Status400BadRequest,
+                KeyNotFoundException => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status500InternalServerError
+            };
     }
 }

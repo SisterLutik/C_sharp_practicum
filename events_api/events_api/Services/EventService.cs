@@ -1,4 +1,5 @@
-﻿using events_api.Interfaces;
+﻿using events_api.events_api.Exceptions;
+using events_api.Interfaces;
 using events_api.Models;
 
 namespace events_api.Services
@@ -20,7 +21,7 @@ namespace events_api.Services
             _events.Add(new Event
             {
                 Id = 2,
-                Title = "Мозгорадная вечеринка",
+                Title = "Мозговая вечеринка",
                 Description = "Думаем сразу много мыслей",
                 StartAt = DateTime.Now.AddDays(3),
                 EndAt = DateTime.Now.AddDays(10)
@@ -32,32 +33,18 @@ namespace events_api.Services
             return _events.FirstOrDefault(e => e.Id == id);
         }
 
-        public PaginatedResult<Event> GetAll(
-                string? title,
-                DateTime? from,
-                DateTime? to,
-                int page,
-                int pageSize)
+        public PaginatedResult<Event> GetAll(string? title, DateTime? from, DateTime? to, int page, int pageSize)
         {
             var query = _events.AsQueryable();
 
-            // Фильтр по названию
             if (!string.IsNullOrWhiteSpace(title))
-            {
                 query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
-            }
 
-            // Фильтр по дате начала
             if (from.HasValue)
-            {
                 query = query.Where(e => e.StartAt >= from.Value);
-            }
 
-            // Фильтр по дате окончания
             if (to.HasValue)
-            {
                 query = query.Where(e => e.EndAt <= to.Value);
-            }
 
             var totalCount = query.Count();
 
@@ -83,31 +70,31 @@ namespace events_api.Services
 
         public void Update(int id, Event updatedEvent)
         {
-            var eventItem = GetById(id);
-            if (eventItem == null)
-            {
-                Console.WriteLine($"Событие #{id} не найдено");
-                return;
-            }
+            var existingEvent = GetById(id);
 
-            // Все поля обязательны
-            eventItem.Title = updatedEvent.Title;
-            eventItem.Description = updatedEvent.Description;
-            eventItem.StartAt = updatedEvent.StartAt;
-            eventItem.EndAt = updatedEvent.EndAt;
+            // ✅ Вместо Console.WriteLine выбрасываем исключение
+            if (existingEvent == null)
+                throw new BusinessException($"Событие с id {id} не найдено", 404);
 
-            if (eventItem.EndAt < eventItem.StartAt)
-                throw new InvalidOperationException("EndAt не может быть меньше StartAt");
+            existingEvent.Title = updatedEvent.Title;
+            existingEvent.Description = updatedEvent.Description;
+            existingEvent.StartAt = updatedEvent.StartAt;
+            existingEvent.EndAt = updatedEvent.EndAt;
 
-            Console.WriteLine($"Событие #{eventItem.Id} успешно обновлено");
+            // Проверка дат
+            if (existingEvent.EndAt <= existingEvent.StartAt)
+                throw new BusinessException("EndAt должен быть позже StartAt", 400);
         }
-
 
         public void Delete(int id)
         {
             var eventItem = GetById(id);
-            if (eventItem != null)
-                _events.Remove(eventItem);
+
+            // ✅ Вместо Console.WriteLine выбрасываем исключение
+            if (eventItem == null)
+                throw new BusinessException($"Событие с id {id} не найдено", 404);
+
+            _events.Remove(eventItem);
         }
     }
 }
