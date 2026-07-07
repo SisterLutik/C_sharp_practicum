@@ -88,10 +88,8 @@ namespace events_api.Services
         public void Delete(int id)
         {
             var eventItem = GetById(id);
-
             if (eventItem == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
-
             _events.Remove(eventItem);
         }
     }

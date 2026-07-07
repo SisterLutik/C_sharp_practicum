@@ -9,9 +9,7 @@ namespace events_api.Services
         private readonly IBookingRepository _bookingRepository;
         private readonly IEventService _eventService;
 
-        public BookingService(
-            IBookingRepository bookingRepository,
-            IEventService eventService)
+        public BookingService(IBookingRepository bookingRepository, IEventService eventService)
         {
             _bookingRepository = bookingRepository;
             _eventService = eventService;

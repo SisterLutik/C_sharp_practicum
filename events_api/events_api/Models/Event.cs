@@ -13,10 +13,10 @@ namespace events_api.Models
         public string? Description { get; set; }
 
         [Required(ErrorMessage = "StartAt обязателен")]
-        public required DateTime StartAt { get; set; }
+        public DateTime StartAt { get; set; }
 
         [Required(ErrorMessage = "EndAt обязателен")]
-        public required DateTime EndAt { get; set; }
+        public DateTime EndAt { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
