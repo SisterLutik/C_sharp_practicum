@@ -100,5 +100,16 @@ namespace events_api.Controllers
             _eventService.Update(id, updatedEvent);
             return Ok(_eventService.GetById(id));
         }
+
+        [HttpDelete("{id}")]
+        public IActionResult Delete(int id)
+        {
+            var existingEvent = _eventService.GetById(id);
+            if (existingEvent == null)
+                return NotFound(new { Message = $"Событие с id {id} не найдено" });
+
+            _eventService.Delete(id);
+            return NoContent();
+        }
     }
 }
