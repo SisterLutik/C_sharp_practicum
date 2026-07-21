@@ -14,5 +14,9 @@ namespace events_api.Models
 
         [Required(ErrorMessage = "EndAt обязателен")]
         public required DateTime EndAt { get; set; }
+
+        [Required(ErrorMessage = "TotalSeats обязателен")]
+        [Range(1, int.MaxValue, ErrorMessage = "TotalSeats должен быть больше 0")]
+        public int TotalSeats { get; set; }
     }
 }

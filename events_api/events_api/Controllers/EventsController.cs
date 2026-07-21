@@ -48,7 +48,18 @@ namespace events_api.Controllers
             if (eventItem == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
-            return Ok(eventItem);
+            var response = new EventResponse
+            {
+                Id = eventItem.Id,
+                Title = eventItem.Title,
+                Description = eventItem.Description,
+                StartAt = eventItem.StartAt,
+                EndAt = eventItem.EndAt,
+                TotalSeats = eventItem.TotalSeats,
+                AvailableSeats = eventItem.AvailableSeats
+            };
+
+            return Ok(response);
         }
 
         [HttpPost]
@@ -60,16 +71,26 @@ namespace events_api.Controllers
             if (request.EndAt <= request.StartAt)
                 throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
-            var newEvent = new Event
+            var newEvent = _eventService.CreateEvent(
+            request.Title,
+            request.Description,
+            request.StartAt,
+            request.EndAt,
+            request.TotalSeats
+           );
+
+            var response = new EventResponse
             {
-                Title = request.Title,
-                Description = request.Description,
-                StartAt = request.StartAt,
-                EndAt = request.EndAt
+                Id = newEvent.Id,
+                Title = newEvent.Title,
+                Description = newEvent.Description,
+                StartAt = newEvent.StartAt,
+                EndAt = newEvent.EndAt,
+                TotalSeats = newEvent.TotalSeats,
+                AvailableSeats = newEvent.AvailableSeats
             };
 
-            _eventService.Add(newEvent);
-            return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, newEvent);
+            return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, response);
         }
 
         [HttpPut("{id}")]

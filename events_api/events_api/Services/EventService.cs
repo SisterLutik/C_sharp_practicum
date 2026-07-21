@@ -12,19 +12,23 @@ namespace events_api.Services
         {
             _events.Add(new Event
             {
-                Id = Guid.NewGuid(),        
+                Id = Guid.NewGuid(),
                 Title = "Интенсив по ловле жуков",
                 Description = "Увлекательный аттракцион",
                 StartAt = DateTime.Now.AddDays(-2),
-                EndAt = DateTime.Now
+                EndAt = DateTime.Now,
+                TotalSeats = 50,
+                AvailableSeats = 50
             });
             _events.Add(new Event
             {
-                Id = Guid.NewGuid(), 
+                Id = Guid.NewGuid(),
                 Title = "Мозговая вечеринка",
                 Description = "Думаем сразу много мыслей",
                 StartAt = DateTime.Now.AddDays(3),
-                EndAt = DateTime.Now.AddDays(10)
+                EndAt = DateTime.Now.AddDays(10),
+                TotalSeats = 30,
+                AvailableSeats = 30
             });
         }
 
@@ -62,16 +66,34 @@ namespace events_api.Services
             };
         }
 
+        public Event CreateEvent(string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
+        {
+            if (totalSeats <= 0)
+                throw new BusinessException("TotalSeats должен быть больше 0", 400);
+
+            var newEvent = new Event
+            {
+                Title = title,
+                Description = description,
+                StartAt = startAt,
+                EndAt = endAt,
+                TotalSeats = totalSeats,
+                AvailableSeats = totalSeats
+            };
+
+            Add(newEvent);
+            return newEvent;
+        }
+
         public void Add(Event eventItem)
         {
-            eventItem.Id = Guid.NewGuid();  
+            eventItem.Id = Guid.NewGuid();
             _events.Add(eventItem);
         }
 
         public void Update(Guid id, Event updatedEvent)
         {
             var existingEvent = GetById(id);
-
             if (existingEvent == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
@@ -79,10 +101,8 @@ namespace events_api.Services
             existingEvent.Description = updatedEvent.Description;
             existingEvent.StartAt = updatedEvent.StartAt;
             existingEvent.EndAt = updatedEvent.EndAt;
-
-            // Проверка дат
-            if (existingEvent.EndAt <= existingEvent.StartAt)
-                throw new BusinessException("EndAt должен быть позже StartAt", 400);
+            existingEvent.TotalSeats = updatedEvent.TotalSeats;
+            existingEvent.AvailableSeats = updatedEvent.AvailableSeats;
         }
 
         public void Delete(Guid id)
