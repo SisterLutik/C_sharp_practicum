@@ -17,10 +17,10 @@ namespace events_api.Controllers
         }
 
         /// <summary>
-        /// GET /bookings/{id} — получить бронь по идентификатору
+        /// GET /api/bookings/{id} — получить бронь по ID
         /// </summary>
         [HttpGet("{id}")]
-        [ProducesResponseType(typeof(Booking), 200)]
+        [ProducesResponseType(typeof(BookingResponse), 200)]
         [ProducesResponseType(404)]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -29,7 +29,16 @@ namespace events_api.Controllers
             if (booking == null)
                 throw new BusinessException($"Бронь с id {id} не найдена", 404);
 
-            return Ok(booking);
+            var response = new BookingResponse
+            {
+                Id = booking.Id,
+                EventId = booking.EventId,
+                Status = booking.Status,
+                CreatedAt = booking.CreatedAt,
+                ProcessedAt = booking.ProcessedAt
+            };
+
+            return Ok(response);
         }
     }
 }
