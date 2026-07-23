@@ -87,7 +87,8 @@ namespace events_api.Services
 
         public void Add(Event eventItem)
         {
-            eventItem.Id = Guid.NewGuid();
+            if (eventItem.Id == Guid.Empty)
+                eventItem.Id = Guid.NewGuid();
             _events.Add(eventItem);
         }
 

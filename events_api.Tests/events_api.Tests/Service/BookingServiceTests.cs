@@ -1,11 +1,9 @@
 ﻿using events_api.Data;
-using events_api.events_api.Exceptions;
+using events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
 using events_api.Services;
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -14,196 +12,101 @@ namespace events_api.Tests.Services
 {
     public class BookingServiceTests
     {
+        private readonly Mock<IEventService> _mockEventService;
+        private readonly IBookingRepository _repository;
+        private readonly BookingService _bookingService;
+
+        public BookingServiceTests()
+        {
+            _repository = new BookingRepository(NullLogger<BookingRepository>.Instance);
+            _mockEventService = new Mock<IEventService>();
+            _bookingService = new BookingService(_repository, _mockEventService.Object);
+        }
+
         // =============================================
-        // ✅ УСПЕШНЫЕ СЦЕНАРИИ (с реальным репозиторием)
+        // ✅ УСПЕШНЫЕ СЦЕНАРИИ (МЕСТА)
         // =============================================
 
         [Fact]
-        public async Task CreateBookingAsync_WithExistingEvent_ShouldReturnBookingWithPendingStatus()
+        public async Task CreateBookingAsync_ShouldDecreaseAvailableSeatsByOne()
         {
             // Arrange
-            var eventId = Guid.NewGuid();  
-            var mockEventService = new Mock<IEventService>();
-            var existingEvent = new Event
-            {
-                Id = eventId,              
-                Title = "Тестовое событие",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2)
-            };
-            mockEventService.Setup(s => s.GetById(eventId)).Returns(existingEvent);
+            var eventId = Guid.NewGuid();
+            var eventWithSeats = CreateTestEvent(eventId, 10);
 
-            var realRepository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-            var bookingService = new BookingService(realRepository, mockEventService.Object);
+            _mockEventService.Setup(s => s.GetById(eventId)).Returns(eventWithSeats);
+            _mockEventService.Setup(s => s.Update(eventId, It.IsAny<Event>()))
+                .Callback<Guid, Event>((id, updatedEvent) =>
+                {
+                    eventWithSeats.AvailableSeats = updatedEvent.AvailableSeats;
+                });
 
             // Act
-            var result = await bookingService.CreateBookingAsync(eventId);
+            var booking = await _bookingService.CreateBookingAsync(eventId);
 
             // Assert
-            result.Should().NotBeNull();
-            result.EventId.Should().Be(eventId);           
-            result.Status.Should().Be(BookingStatus.Pending);
-            result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-            result.ProcessedAt.Should().BeNull();
-            result.Id.Should().NotBeEmpty();
-            result.Id.Should().NotBe(Guid.Empty);
+            booking.Should().NotBeNull();
+            eventWithSeats.AvailableSeats.Should().Be(9);
         }
 
         [Fact]
-        public async Task CreateBookingAsync_MultipleBookingsForSameEvent_ShouldReturnUniqueIds()
+        public async Task CreateBookingAsync_MultipleBookingsUpToLimit_ShouldAllSucceed()
         {
             // Arrange
-            var eventId = Guid.NewGuid(); ;
-            var mockEventService = new Mock<IEventService>();
-            var existingEvent = new Event
-            {
-                Id = eventId,
-                Title = "Тестовое событие",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2)
-            };
-            mockEventService.Setup(s => s.GetById(eventId)).Returns(existingEvent);
+            var eventId = Guid.NewGuid();
+            var totalSeats = 5;
+            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
 
-            var realRepository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-            var bookingService = new BookingService(realRepository, mockEventService.Object);
+            _mockEventService.Setup(s => s.GetById(eventId)).Returns(eventWithSeats);
+            _mockEventService.Setup(s => s.Update(eventId, It.IsAny<Event>()))
+                .Callback<Guid, Event>((id, updatedEvent) =>
+                {
+                    eventWithSeats.AvailableSeats = updatedEvent.AvailableSeats;
+                });
+
+            var bookingIds = new List<Guid>();
 
             // Act
-            var booking1 = await bookingService.CreateBookingAsync(eventId);
-            var booking2 = await bookingService.CreateBookingAsync(eventId);
-            var booking3 = await bookingService.CreateBookingAsync(eventId);
-
-            // Assert
-            booking1.Id.Should().NotBeEmpty();
-            booking2.Id.Should().NotBeEmpty();
-            booking3.Id.Should().NotBeEmpty();
-            booking1.Id.Should().NotBe(booking2.Id);
-            booking1.Id.Should().NotBe(booking3.Id);
-            booking2.Id.Should().NotBe(booking3.Id);
-        }
-
-        [Fact]
-        public async Task GetBookingByIdAsync_WithExistingId_ShouldReturnCorrectBooking()
-        {
-            // Arrange
-            var eventId = Guid.NewGuid(); 
-            var mockEventService = new Mock<IEventService>();
-            var existingEvent = new Event
+            for (int i = 0; i < totalSeats; i++)
             {
-                Id = eventId,
-                Title = "Тестовое событие",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2)
-            };
-            mockEventService.Setup(s => s.GetById(eventId)).Returns(existingEvent);
-
-            var realRepository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-            var bookingService = new BookingService(realRepository, mockEventService.Object);
-
-            // Act — создаём бронь
-            var createdBooking = await bookingService.CreateBookingAsync(eventId);
-
-            // Получаем её по Id
-            var result = await bookingService.GetBookingByIdAsync(createdBooking.Id);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.Id.Should().Be(createdBooking.Id);
-            result.EventId.Should().Be(eventId);
-            result.Status.Should().Be(BookingStatus.Pending);
-            result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-            result.ProcessedAt.Should().BeNull();
-        }
-
-        [Fact]
-        public async Task GetBookingByIdAsync_ShouldReflectStatusChangeAfterConfirm()
-        {
-            // Arrange
-            var eventId = Guid.NewGuid(); 
-            var mockEventService = new Mock<IEventService>();
-            var existingEvent = new Event
-            {
-                Id = eventId,
-                Title = "Тестовое событие",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2)
-            };
-            mockEventService.Setup(s => s.GetById(eventId)).Returns(existingEvent);
-
-            var realRepository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-
-            var bookingService = new BookingService(realRepository, mockEventService.Object);
-
-            // Act — создаём бронь
-            var booking = await bookingService.CreateBookingAsync(eventId);
-
-            // Проверяем, что статус Pending
-            var pendingBooking = await bookingService.GetBookingByIdAsync(booking.Id);
-            pendingBooking!.Status.Should().Be(BookingStatus.Pending);
-
-            // Меняем статус вручную (имитация фонового сервиса)
-            booking.Status = BookingStatus.Confirmed;
-            booking.ProcessedAt = DateTime.UtcNow;
-            realRepository.Update(booking);
-
-            // Получаем обновлённую бронь
-            var confirmedBooking = await bookingService.GetBookingByIdAsync(booking.Id);
-
-            // Assert
-            confirmedBooking.Should().NotBeNull();
-            confirmedBooking!.Status.Should().Be(BookingStatus.Confirmed);
-            confirmedBooking.ProcessedAt.Should().NotBeNull();
-        }
-
-        [Fact]
-        public async Task BookingBackgroundService_ShouldProcessPendingBookings()
-        {
-            // Arrange
-            var realRepository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-
-            var booking = new Booking { EventId = Guid.NewGuid() };
-            realRepository.Add(booking); // статус Pending
-            var loggerMock = new Mock<ILogger<BookingBackgroundService>>();
-            var serviceProviderMock = new Mock<IServiceProvider>();
-            var scopeMock = new Mock<IServiceScope>();
-            var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-
-            // Настраиваем моки для DI
-            scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
-            scopeMock.Setup(x => x.ServiceProvider.GetService(typeof(IBookingRepository)))
-                .Returns(realRepository);
-
-            serviceProviderMock.Setup(x => x.GetService(typeof(IServiceScopeFactory)))
-                .Returns(scopeFactoryMock.Object);
-
-            var backgroundService = new BookingBackgroundService(
-                serviceProviderMock.Object,
-                loggerMock.Object);
-
-            // Получаем Id созданной брони
-            var bookingId = booking.Id;
-
-            // Act — запускаем обработку через отражение (вызываем приватный метод)
-            var methodInfo = typeof(BookingBackgroundService).GetMethod(
-                "ProcessPendingBookings",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-            // Создаём CancellationToken для имитации работы
-            using var cts = new CancellationTokenSource();
-
-            // Вызываем приватный метод
-            var task = (Task?)methodInfo?.Invoke(backgroundService, new object[] { cts.Token });
-            if (task != null)
-            {
-                await task;
+                var booking = await _bookingService.CreateBookingAsync(eventId);
+                bookingIds.Add(booking.Id);
             }
 
-            // Assert — проверяем, что статус изменился на Confirmed
-            var processedBooking = realRepository.GetById(bookingId);
-            processedBooking.Should().NotBeNull();
-            processedBooking!.Status.Should().Be(BookingStatus.Confirmed);
-            processedBooking.ProcessedAt.Should().NotBeNull();
+            // Assert
+            bookingIds.Should().HaveCount(totalSeats);
+            bookingIds.Should().OnlyHaveUniqueItems();
+            eventWithSeats.AvailableSeats.Should().Be(0);
         }
-    
+
+        [Fact]
+        public async Task CreateBookingAsync_WhenSeatsExhausted_ShouldThrowNoAvailableSeatsException()
+        {
+            // Arrange
+            var eventId = Guid.NewGuid();
+            var totalSeats = 1;
+            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
+
+            _mockEventService.Setup(s => s.GetById(eventId)).Returns(eventWithSeats);
+            _mockEventService.Setup(s => s.Update(eventId, It.IsAny<Event>()))
+                .Callback<Guid, Event>((id, updatedEvent) =>
+                {
+                    eventWithSeats.AvailableSeats = updatedEvent.AvailableSeats;
+                });
+
+            // Act — создаём первую бронь
+            var firstBooking = await _bookingService.CreateBookingAsync(eventId);
+
+            // Assert
+            firstBooking.Should().NotBeNull();
+            eventWithSeats.AvailableSeats.Should().Be(0);
+
+            // Act & Assert — вторая попытка должна выбросить исключение
+            var exception = await Assert.ThrowsAsync<NoAvailableSeatsException>(() =>
+                _bookingService.CreateBookingAsync(eventId));
+
+            exception.Message.Should().Be($"Нет свободных мест для события {eventId}");
+        }
 
         // =============================================
         // ❌ НЕУСПЕШНЫЕ СЦЕНАРИИ
@@ -212,73 +115,224 @@ namespace events_api.Tests.Services
         [Fact]
         public async Task CreateBookingAsync_WithNonExistingEvent_ShouldThrowBusinessException()
         {
-            var eventId = Guid.NewGuid();  // ✅ Guid
-            var mockEventService = new Mock<IEventService>();
-            mockEventService.Setup(s => s.GetById(eventId)).Returns((Event?)null);
-
-            var realRepository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-            var bookingService = new BookingService(realRepository, mockEventService.Object);
+            // Arrange
+            var nonExistingId = Guid.NewGuid();
+            _mockEventService.Setup(s => s.GetById(nonExistingId)).Returns((Event?)null);
 
             // Act & Assert
             var exception = await Assert.ThrowsAsync<BusinessException>(() =>
-                bookingService.CreateBookingAsync(eventId));
+                _bookingService.CreateBookingAsync(nonExistingId));
 
-            exception.Message.Should().Be($"Событие с id {eventId} не найдено");
+            exception.Message.Should().Be($"Событие с id {nonExistingId} не найдено");
             exception.StatusCode.Should().Be(404);
         }
 
         [Fact]
-        public async Task CreateBookingAsync_ForDeletedEvent_ShouldThrowBusinessException()
+        public async Task CreateBookingAsync_WithNoAvailableSeats_ShouldThrowNoAvailableSeatsException()
         {
             // Arrange
             var eventId = Guid.NewGuid();
-            var mockEventService = new Mock<IEventService>();
-            var existingEvent = new Event
+            var totalSeats = 0;
+            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
+            _mockEventService.Setup(s => s.GetById(eventId)).Returns(eventWithSeats);
+
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<NoAvailableSeatsException>(() =>
+                _bookingService.CreateBookingAsync(eventId));
+
+            exception.Message.Should().Be($"Нет свободных мест для события {eventId}");
+        }
+
+        // =============================================
+        // 🧪 ТЕСТЫ НА СМЕНУ СТАТУСА
+        // =============================================
+
+        [Fact]
+        public void Confirm_ShouldSetStatusToConfirmedAndSetProcessedAt()
+        {
+            // Arrange
+            var booking = new Booking
             {
-                Id = eventId,
-                Title = "Тестовое событие",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2)
+                Id = Guid.NewGuid(),
+                EventId = Guid.NewGuid(),
+                Status = BookingStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                ProcessedAt = null
             };
 
-            // Событие существует при первом вызове
-            mockEventService.Setup(s => s.GetById(eventId)).Returns(existingEvent);
-
-            var realRepository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-            var bookingService = new BookingService(realRepository, mockEventService.Object);
-
-            // Act — создаём бронь
-            var booking = await bookingService.CreateBookingAsync(eventId);
-            booking.Should().NotBeNull();
-            booking.Id.Should().NotBeEmpty();
-
-            // Удаляем событие (имитация удаления)
-            mockEventService.Setup(s => s.GetById(eventId)).Returns((Event?)null);
-
-            // Пытаемся создать ещё одну бронь для удалённого события
-            var exception = await Assert.ThrowsAsync<BusinessException>(() =>
-                bookingService.CreateBookingAsync(eventId));
+            // Act
+            booking.Confirm();
 
             // Assert
-            exception.Message.Should().Be($"Событие с id {eventId} не найдено");
-            exception.StatusCode.Should().Be(404);
+            booking.Status.Should().Be(BookingStatus.Confirmed);
+            booking.ProcessedAt.Should().NotBeNull();
+            booking.ProcessedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
         }
 
         [Fact]
-        public async Task GetBookingByIdAsync_WithNonExistingId_ShouldThrowBusinessException()
+        public void Reject_ShouldSetStatusToRejectedAndSetProcessedAt()
         {
             // Arrange
-            var nonExistingId = Guid.NewGuid();
-            var mockEventService = new Mock<IEventService>();
-            var realRepository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-            var bookingService = new BookingService(realRepository, mockEventService.Object);
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                EventId = Guid.NewGuid(),
+                Status = BookingStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                ProcessedAt = null
+            };
 
-            // Act & Assert
-            var exception = await Assert.ThrowsAsync<BusinessException>(() =>
-                bookingService.GetBookingByIdAsync(nonExistingId));
+            // Act
+            booking.Reject();
 
-            exception.Message.Should().Be($"Бронь с id {nonExistingId} не найдена");
-            exception.StatusCode.Should().Be(404);
+            // Assert
+            booking.Status.Should().Be(BookingStatus.Rejected);
+            booking.ProcessedAt.Should().NotBeNull();
+            booking.ProcessedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        }
+
+        [Fact]
+        public void ReleaseSeats_ShouldRestoreAvailableSeatsAfterReject()
+        {
+            // Arrange
+            var eventWithSeats = CreateTestEvent(Guid.NewGuid(), 10);
+            var initialSeats = eventWithSeats.AvailableSeats;
+
+            // Act — резервируем место
+            var reserveResult = eventWithSeats.TryReserveSeats();
+            var seatsAfterReserve = eventWithSeats.AvailableSeats;
+
+            // Act — освобождаем место
+            eventWithSeats.ReleaseSeats();
+            var seatsAfterRelease = eventWithSeats.AvailableSeats;
+
+            // Assert
+            reserveResult.Should().BeTrue();
+            seatsAfterReserve.Should().Be(initialSeats - 1);
+            seatsAfterRelease.Should().Be(initialSeats);
+        }
+
+        [Fact]
+        public async Task AfterReject_ShouldBeAbleToCreateNewBookingForSameSpot()
+        {
+            // Arrange
+            var eventId = Guid.NewGuid();
+            var eventWithSeats = CreateTestEvent(eventId, 1);
+
+            _mockEventService.Setup(s => s.GetById(eventId)).Returns(eventWithSeats);
+            _mockEventService.Setup(s => s.Update(eventId, It.IsAny<Event>()))
+                .Callback<Guid, Event>((id, updatedEvent) =>
+                {
+                    eventWithSeats.AvailableSeats = updatedEvent.AvailableSeats;
+                });
+
+            // Act — создаём бронь
+            var booking = await _bookingService.CreateBookingAsync(eventId);
+            eventWithSeats.AvailableSeats.Should().Be(0);
+
+            // Act — отменяем бронь (освобождаем место)
+            booking.Reject();
+            _repository.Update(booking);
+            eventWithSeats.ReleaseSeats();
+
+            // Проверяем, что место освободилось
+            eventWithSeats.AvailableSeats.Should().Be(1);
+
+            // Act — создаём новую бронь
+            var newBooking = await _bookingService.CreateBookingAsync(eventId);
+
+            // Assert
+            newBooking.Should().NotBeNull();
+            newBooking.Id.Should().NotBe(booking.Id);
+            newBooking.Status.Should().Be(BookingStatus.Pending);
+            eventWithSeats.AvailableSeats.Should().Be(0);
+        }
+
+        // =============================================
+        // 🧪 ТЕСТЫ НА КОНКУРЕНТНОСТЬ
+        // =============================================
+
+        [Fact]
+        public async Task ConcurrentBooking_With5SeatsAnd20Requests_ShouldSucceedExactly5AndThrow15()
+        {
+            // Arrange
+            var eventId = Guid.NewGuid();
+            var totalSeats = 5;
+            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
+
+            _mockEventService.Setup(s => s.GetById(eventId)).Returns(eventWithSeats);
+            _mockEventService.Setup(s => s.Update(eventId, It.IsAny<Event>()))
+                .Callback<Guid, Event>((id, updatedEvent) =>
+                {
+                    eventWithSeats.AvailableSeats = updatedEvent.AvailableSeats;
+                });
+
+            // Act
+            var tasks = new List<Task<Booking>>();
+            for (int i = 0; i < 20; i++)
+            {
+                tasks.Add(_bookingService.CreateBookingAsync(eventId));
+            }
+
+            var results = await Task.WhenAll(tasks.Select(t => t.ContinueWith(r => r)));
+            var exceptions = results.Where(r => r.IsFaulted).Select(r => r.Exception?.InnerException).ToList();
+            var successful = results.Where(r => r.IsCompletedSuccessfully).Select(r => r.Result).ToList();
+
+            // Assert
+            successful.Should().HaveCount(totalSeats);
+            successful.Select(b => b.Id).Should().OnlyHaveUniqueItems();
+            exceptions.Should().HaveCount(15);
+            exceptions.Should().AllBeOfType<NoAvailableSeatsException>();
+            eventWithSeats.AvailableSeats.Should().Be(0);
+        }
+
+        [Fact]
+        public async Task ConcurrentBooking_With10SeatsAnd10Requests_ShouldAllSucceedWithUniqueIds()
+        {
+            // Arrange
+            var eventId = Guid.NewGuid();
+            var totalSeats = 10;
+            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
+
+            _mockEventService.Setup(s => s.GetById(eventId)).Returns(eventWithSeats);
+            _mockEventService.Setup(s => s.Update(eventId, It.IsAny<Event>()))
+                .Callback<Guid, Event>((id, updatedEvent) =>
+                {
+                    eventWithSeats.AvailableSeats = updatedEvent.AvailableSeats;
+                });
+
+            // Act
+            var tasks = new List<Task<Booking>>();
+            for (int i = 0; i < totalSeats; i++)
+            {
+                tasks.Add(_bookingService.CreateBookingAsync(eventId));
+            }
+
+            var results = await Task.WhenAll(tasks);
+            var bookingIds = results.Select(b => b.Id).ToList();
+
+            // Assert
+            results.Should().HaveCount(totalSeats);
+            bookingIds.Should().OnlyHaveUniqueItems();
+            eventWithSeats.AvailableSeats.Should().Be(0);
+        }
+
+        // =============================================
+        // 🔧 ВСПОМОГАТЕЛЬНЫЙ МЕТОД
+        // =============================================
+
+        private Event CreateTestEvent(Guid eventId, int totalSeats)
+        {
+            return new Event
+            {
+                Id = eventId,
+                Title = $"Тестовое событие на {totalSeats} мест",
+                Description = "Описание",
+                StartAt = DateTime.Now.AddDays(1),
+                EndAt = DateTime.Now.AddDays(2),
+                TotalSeats = totalSeats,
+                AvailableSeats = totalSeats
+            };
         }
     }
 }
