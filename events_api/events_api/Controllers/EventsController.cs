@@ -1,7 +1,7 @@
-using events_api.events_api.Exceptions;
+using Microsoft.AspNetCore.Mvc;
 using events_api.Interfaces;
 using events_api.Models;
-using Microsoft.AspNetCore.Mvc;
+using events_api.Exceptions;
 
 namespace events_api.Controllers
 {
@@ -16,10 +16,11 @@ namespace events_api.Controllers
         {
             _eventService = eventService;
             _bookingService = bookingService;
-
         }
 
         [HttpGet]
+        [ProducesResponseType(typeof(PaginatedResult<Event>), 200)]
+        [ProducesResponseType(400)]
         public IActionResult GetAll(
             [FromQuery] string? title,
             [FromQuery] DateTime? from,
@@ -41,6 +42,8 @@ namespace events_api.Controllers
         }
 
         [HttpGet("{id}")]
+        [ProducesResponseType(typeof(Event), 200)]
+        [ProducesResponseType(404)]
         public IActionResult GetById(Guid id)
         {
             var eventItem = _eventService.GetById(id);
@@ -48,21 +51,12 @@ namespace events_api.Controllers
             if (eventItem == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
-            var response = new EventResponse
-            {
-                Id = eventItem.Id,
-                Title = eventItem.Title,
-                Description = eventItem.Description,
-                StartAt = eventItem.StartAt,
-                EndAt = eventItem.EndAt,
-                TotalSeats = eventItem.TotalSeats,
-                AvailableSeats = eventItem.AvailableSeats
-            };
-
-            return Ok(response);
+            return Ok(eventItem);
         }
 
         [HttpPost]
+        [ProducesResponseType(typeof(Event), 201)]
+        [ProducesResponseType(400)]
         public IActionResult Create([FromBody] CreateEventRequest request)
         {
             if (!ModelState.IsValid)
@@ -72,28 +66,20 @@ namespace events_api.Controllers
                 throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
             var newEvent = _eventService.CreateEvent(
-            request.Title,
-            request.Description,
-            request.StartAt,
-            request.EndAt,
-            request.TotalSeats
-           );
+                request.Title,
+                request.Description,
+                request.StartAt,
+                request.EndAt,
+                request.TotalSeats
+            );
 
-            var response = new EventResponse
-            {
-                Id = newEvent.Id,
-                Title = newEvent.Title,
-                Description = newEvent.Description,
-                StartAt = newEvent.StartAt,
-                EndAt = newEvent.EndAt,
-                TotalSeats = newEvent.TotalSeats,
-                AvailableSeats = newEvent.AvailableSeats
-            };
-
-            return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, response);
+            return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, newEvent);
         }
 
         [HttpPut("{id}")]
+        [ProducesResponseType(typeof(Event), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(404)]
         public IActionResult Update(Guid id, [FromBody] Event updatedEvent)
         {
             if (id != updatedEvent.Id)
@@ -114,6 +100,8 @@ namespace events_api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [ProducesResponseType(204)]
+        [ProducesResponseType(404)]
         public IActionResult Delete(Guid id)
         {
             var existingEvent = _eventService.GetById(id);
@@ -123,24 +111,35 @@ namespace events_api.Controllers
             _eventService.Delete(id);
             return NoContent();
         }
+
+        /// <summary>
+        /// POST /api/events/{id}/book — создать бронь для события
+        /// </summary>
         [HttpPost("{id}/book")]
-               [ProducesResponseType(typeof(Booking), 202)]
-        [ProducesResponseType(404)]
+        [ProducesResponseType(typeof(BookingResponse), 202)]
         [ProducesResponseType(400)]
-        public async Task<IActionResult> CreateBooking(Guid id)
+        [ProducesResponseType(404)]
+        [ProducesResponseType(409)]
+        public IActionResult CreateBooking(Guid id)
         {
-            // Проверяем, существует ли событие
             var eventExists = _eventService.GetById(id);
             if (eventExists == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
-            // Создаём бронь
-            var booking = await _bookingService.CreateBookingAsync(id);
+            var booking = _bookingService.CreateBooking(id);
 
-            // Возвращаем 202 Accepted с телом и Location
+            var response = new BookingResponse
+            {
+                Id = booking.Id,
+                EventId = booking.EventId,
+                Status = booking.Status,
+                CreatedAt = booking.CreatedAt,
+                ProcessedAt = booking.ProcessedAt
+            };
+
             return Accepted(
                 new Uri($"/api/bookings/{booking.Id}", UriKind.Relative),
-                booking
+                response
             );
         }
 

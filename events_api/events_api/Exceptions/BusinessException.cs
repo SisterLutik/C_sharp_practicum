@@ -1,4 +1,6 @@
-﻿namespace events_api.Exceptions
+﻿using System;
+
+namespace events_api.Exceptions  
 {
     public class BusinessException : Exception
     {

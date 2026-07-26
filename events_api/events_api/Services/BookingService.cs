@@ -16,40 +16,30 @@ namespace events_api.Services
             _eventService = eventService;
         }
 
-        public async Task<Booking> CreateBookingAsync(Guid eventId)
+        public Booking CreateBooking(Guid eventId)
         {
             lock (_bookingLock)
             {
-                // 1. Получаем событие
                 var eventExists = _eventService.GetById(eventId);
                 if (eventExists == null)
                     throw new BusinessException($"Событие с id {eventId} не найдено", 404);
 
-                // 2. Пытаемся зарезервировать место
                 if (!eventExists.TryReserveSeats())
-                    throw new NoAvailableSeatsException($"Нет свободных мест для события {eventId}");
+                    throw new NoAvailableSeatsException("No available seats for this event");
 
-                // 3. Сохраняем обновлённое событие
                 _eventService.Update(eventId, eventExists);
 
-                // 4. Создаём бронь
-                var booking = new Booking
-                {
-                    EventId = eventId
-                };
-
+                var booking = new Booking { EventId = eventId };
                 _bookingRepository.Add(booking);
                 return booking;
             }
         }
 
-        public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
+        public Booking? GetBookingById(Guid bookingId)
         {
             var booking = _bookingRepository.GetById(bookingId);
-
             if (booking == null)
                 throw new BusinessException($"Бронь с id {bookingId} не найдена", 404);
-
             return booking;
         }
     }

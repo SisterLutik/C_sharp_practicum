@@ -1,4 +1,4 @@
-﻿using events_api.events_api.Exceptions;
+﻿using events_api.Exceptions; 
 using events_api.Interfaces;
 using events_api.Models;
 
@@ -71,6 +71,9 @@ namespace events_api.Services
             if (totalSeats <= 0)
                 throw new BusinessException("TotalSeats должен быть больше 0", 400);
 
+            if (endAt <= startAt)
+                throw new BusinessException("EndAt должен быть позже StartAt", 400);
+
             var newEvent = new Event
             {
                 Title = title,
@@ -104,6 +107,9 @@ namespace events_api.Services
             existingEvent.EndAt = updatedEvent.EndAt;
             existingEvent.TotalSeats = updatedEvent.TotalSeats;
             existingEvent.AvailableSeats = updatedEvent.AvailableSeats;
+
+            if (existingEvent.EndAt <= existingEvent.StartAt)
+                throw new BusinessException("EndAt должен быть позже StartAt", 400);
         }
 
         public void Delete(Guid id)

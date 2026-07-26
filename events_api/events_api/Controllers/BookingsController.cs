@@ -1,7 +1,7 @@
-﻿using events_api.events_api.Exceptions;
+﻿using Microsoft.AspNetCore.Mvc;
 using events_api.Interfaces;
 using events_api.Models;
-using Microsoft.AspNetCore.Mvc;
+using events_api.Exceptions;
 
 namespace events_api.Controllers
 {
@@ -22,9 +22,9 @@ namespace events_api.Controllers
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(BookingResponse), 200)]
         [ProducesResponseType(404)]
-        public async Task<IActionResult> GetById(Guid id)
+        public IActionResult GetById(Guid id)
         {
-            var booking = await _bookingService.GetBookingByIdAsync(id);
+            var booking = _bookingService.GetBookingById(id);
 
             if (booking == null)
                 throw new BusinessException($"Бронь с id {id} не найдена", 404);

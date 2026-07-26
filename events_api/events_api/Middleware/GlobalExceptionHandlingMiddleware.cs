@@ -1,4 +1,4 @@
-﻿using events_api.events_api.Exceptions;
+﻿using events_api.Exceptions;
 
 namespace events_api.Middleware
 {
@@ -55,6 +55,8 @@ namespace events_api.Middleware
         private static int MapStatusCode(Exception ex)
             => ex switch
             {
+                NoAvailableSeatsException => StatusCodes.Status409Conflict,
+
                 BusinessException businessEx => businessEx.StatusCode,
                 ArgumentException => StatusCodes.Status400BadRequest,
                 InvalidOperationException => StatusCodes.Status400BadRequest,
