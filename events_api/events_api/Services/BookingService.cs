@@ -8,7 +8,7 @@ namespace events_api.Services
     {
         private readonly IBookingRepository _bookingRepository;
         private readonly IEventService _eventService;
-        private readonly object _bookingLock = new();
+        private static readonly object _bookingLock = new();  // ← static!
 
         public BookingService(IBookingRepository bookingRepository, IEventService eventService)
         {
@@ -18,7 +18,7 @@ namespace events_api.Services
 
         public Booking CreateBooking(Guid eventId)
         {
-            lock (_bookingLock)
+            lock (_bookingLock)  // ← общий для всех запросов
             {
                 var eventExists = _eventService.GetById(eventId);
                 if (eventExists == null)

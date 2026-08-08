@@ -1,5 +1,7 @@
 ﻿using events_api.Interfaces;
 using events_api.Models;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace events_api.Services
 {
@@ -28,7 +30,7 @@ namespace events_api.Services
                 {
                     await ProcessPendingBookings(stoppingToken);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogError(ex, "Ошибка при обработке броней");
                 }
@@ -44,18 +46,25 @@ namespace events_api.Services
             using var scope = _serviceProvider.CreateScope();
             var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
 
-            // Получаем все брони со статусом Pending
             var allBookings = bookingRepository.GetAll();
             var pendingBookings = allBookings.Where(b => b.Status == BookingStatus.Pending).ToList();
 
             if (!pendingBookings.Any())
-                return; 
+                return;
+
             _logger.LogInformation($"Найдено {pendingBookings.Count} броней в статусе Pending");
 
+            // ✅ Каждая задача получает свой scope
             var tasks = pendingBookings.Select(booking =>
-                ProcessBookingAsync(booking, stoppingToken, scope));
+                ProcessBookingWithOwnScopeAsync(booking, stoppingToken));
 
             await Task.WhenAll(tasks);
+        }
+
+        private async Task ProcessBookingWithOwnScopeAsync(Booking booking, CancellationToken stoppingToken)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            await ProcessBookingAsync(booking, stoppingToken, scope);
         }
 
         private async Task ProcessBookingAsync(
@@ -65,11 +74,9 @@ namespace events_api.Services
         {
             try
             {
-                // 1. Имитация обращения к внешней системе (параллельно у всех броней)
                 _logger.LogInformation($"Обработка брони #{booking.Id}...");
                 await Task.Delay(2000, stoppingToken);
 
-                // 2. Захват семафора перед записью в хранилище
                 await _processingSemaphore.WaitAsync(stoppingToken);
 
                 try
@@ -77,26 +84,24 @@ namespace events_api.Services
                     var eventService = scope.ServiceProvider.GetRequiredService<IEventService>();
                     var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
 
-                    // 3. Проверяем, существует ли событие
                     var eventExists = eventService.GetById(booking.EventId);
 
                     if (eventExists == null)
                     {
-                        // Событие удалено — отклоняем бронь
                         booking.Reject();
                         bookingRepository.Update(booking);
-                        _logger.LogWarning($"Бронь #{booking.Id} отклонена: событие #{booking.EventId} не найдено");
+                        _logger.LogWarning(
+                            $"Бронь #{booking.Id} отклонена: событие #{booking.EventId} не найдено. " +
+                            "Места не возвращаются, так как событие удалено.");
                         return;
                     }
 
-                    // 4. Подтверждаем бронь
                     booking.Confirm();
                     bookingRepository.Update(booking);
                     _logger.LogInformation($"Бронь #{booking.Id} подтверждена. ProcessedAt: {booking.ProcessedAt}");
                 }
                 finally
                 {
-                    // 5. Освобождаем семафор
                     _processingSemaphore.Release();
                 }
             }
@@ -106,7 +111,6 @@ namespace events_api.Services
             }
             catch (Exception ex)
             {
-                // 6. Непредвиденная ошибка — отклоняем бронь и возвращаем место
                 try
                 {
                     await _processingSemaphore.WaitAsync(stoppingToken);

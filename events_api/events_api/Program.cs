@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddSingleton<IEventService, EventService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddSingleton<IBookingService, BookingService>();
 builder.Services.AddHostedService<BookingBackgroundService>();
 builder.Services.AddSingleton<IBookingRepository, BookingRepository>();
 
