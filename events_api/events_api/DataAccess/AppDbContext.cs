@@ -1,6 +1,5 @@
 ﻿using events_api.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Reflection.Emit;
 
 namespace events_api.DataAccess
 {
@@ -13,6 +12,7 @@ namespace events_api.DataAccess
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // Автоматически подключает все конфигурации из сборки
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         }
     }

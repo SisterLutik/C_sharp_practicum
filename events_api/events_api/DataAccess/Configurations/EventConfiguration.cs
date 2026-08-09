@@ -13,7 +13,8 @@ namespace events_api.DataAccess.Configurations
 
             // 2. Первичный ключ
             builder.HasKey(e => e.Id);
-            builder.Property(e => e.Id).ValueGeneratedNever();
+            builder.Property(e => e.Id)
+                .ValueGeneratedNever();
 
             // 3. Ограничения для свойств
             builder.Property(e => e.Title)
