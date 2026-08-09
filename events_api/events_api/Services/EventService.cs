@@ -10,26 +10,22 @@ namespace events_api.Services
 
         public EventService()
         {
-            _events.Add(new Event
-            {
-                Id = Guid.NewGuid(),
-                Title = "Интенсив по ловле жуков",
-                Description = "Увлекательный аттракцион",
-                StartAt = DateTime.Now.AddDays(-2),
-                EndAt = DateTime.Now,
-                TotalSeats = 50,
-                AvailableSeats = 50
-            });
-            _events.Add(new Event
-            {
-                Id = Guid.NewGuid(),
-                Title = "Мозговая вечеринка",
-                Description = "Думаем сразу много мыслей",
-                StartAt = DateTime.Now.AddDays(3),
-                EndAt = DateTime.Now.AddDays(10),
-                TotalSeats = 30,
-                AvailableSeats = 30
-            });
+            _events.Add(new Event(
+
+            "Интенсив по ловле жуков",
+            DateTime.Now.AddDays(-2),
+            DateTime.Now,
+            50,
+            "Увлекательный аттракцион"
+                ));
+            _events.Add(new Event(
+               "Мозговая вечеринка",
+                DateTime.Now.AddDays(3),
+                DateTime.Now.AddDays(10),
+                30,
+                "Думаем сразу много мыслей"
+
+            ));
         }
 
         public Event? GetById(Guid id)
@@ -74,15 +70,13 @@ namespace events_api.Services
             if (endAt <= startAt)
                 throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
-            var newEvent = new Event
-            {
-                Title = title,
-                Description = description,
-                StartAt = startAt,
-                EndAt = endAt,
-                TotalSeats = totalSeats,
-                AvailableSeats = totalSeats
-            };
+            var newEvent = new Event(
+                title,
+                startAt,
+                endAt,
+                totalSeats,
+                description
+            );
 
             Add(newEvent);
             return newEvent;
@@ -90,8 +84,6 @@ namespace events_api.Services
 
         public void Add(Event eventItem)
         {
-            if (eventItem.Id == Guid.Empty)
-                eventItem.Id = Guid.NewGuid();
             _events.Add(eventItem);
         }
 

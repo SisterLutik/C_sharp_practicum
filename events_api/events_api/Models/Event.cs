@@ -1,38 +1,43 @@
 using System.ComponentModel.DataAnnotations;
 
 namespace events_api.Models
-
 {
     public class Event : IValidatableObject
     {
-        public Guid Id { get; set; }
+        private Event() { }
 
-        [Required(ErrorMessage = "Title обязателен")]
-        public required string Title { get; set; }
-
-        public string? Description { get; set; }
-
-        [Required(ErrorMessage = "StartAt обязателен")]
-        public DateTime StartAt { get; set; }
-
-        [Required(ErrorMessage = "EndAt обязателен")]
-        public DateTime EndAt { get; set; }
-
-        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        public Event(string title, DateTime startAt, DateTime endAt, int totalSeats, string? description = null)
         {
-            if (StartAt >= EndAt)
-            {
-                yield return new ValidationResult(
-                    "Дата старта события должна быть раньше, чем дата конца",
-                    new[] { nameof(StartAt), nameof(EndAt) }
-                );
-            }
+            Id = Guid.NewGuid();
+            Title = title ?? throw new ArgumentNullException(nameof(title));
+            Description = description;
+            StartAt = startAt;
+            EndAt = endAt;
+            TotalSeats = totalSeats;
+            AvailableSeats = totalSeats;
+            Bookings = new List<Booking>();  // ✅ Инициализация коллекции
         }
 
-        [Required(ErrorMessage = "TotalSeats обязателен")]
-        public int TotalSeats { get; set; }
+        public Guid Id { get; internal set; }
 
-        public int AvailableSeats { get; set; }
+        [Required(ErrorMessage = "Title обязателен")]
+        public string Title { get; internal set; } = null!;
+
+        public string? Description { get; internal set; }
+
+        [Required(ErrorMessage = "StartAt обязателен")]
+        public DateTime StartAt { get; internal set; }
+
+        [Required(ErrorMessage = "EndAt обязателен")]
+        public DateTime EndAt { get; internal set; }
+
+        [Required(ErrorMessage = "TotalSeats обязателен")]
+        public int TotalSeats { get; internal set; }
+
+        public int AvailableSeats { get; internal set; }
+
+        // ✅ Навигационное свойство: событие → брони
+        public ICollection<Booking> Bookings { get; internal set; } = new List<Booking>();
 
         public bool TryReserveSeats(int count = 1)
         {
@@ -46,6 +51,17 @@ namespace events_api.Models
         public void ReleaseSeats(int count = 1)
         {
             AvailableSeats = Math.Min(AvailableSeats + count, TotalSeats);
+        }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (StartAt >= EndAt)
+            {
+                yield return new ValidationResult(
+                    "Дата старта события должна быть раньше, чем дата конца",
+                    new[] { nameof(StartAt), nameof(EndAt) }
+                );
+            }
         }
     }
 }

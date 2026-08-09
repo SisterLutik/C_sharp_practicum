@@ -13,21 +13,12 @@ namespace events_api.Data
         {
             _logger = logger;
             // Имитация начальных данных
-            _bookings.Add(new Booking
-            {
-                Id = Guid.NewGuid(),
-                EventId = Guid.NewGuid(),
-                Status = BookingStatus.Confirmed,
-                CreatedAt = DateTime.UtcNow.AddDays(-5),
-                ProcessedAt = DateTime.UtcNow.AddDays(-4)
-            });
-            _bookings.Add(new Booking
-            {
-                Id = Guid.NewGuid(),
-                EventId = Guid.NewGuid(),
-                Status = BookingStatus.Pending,
-                CreatedAt = DateTime.UtcNow.AddDays(-2)
-            });
+            _bookings.Add(new Booking(
+                Guid.NewGuid()
+                ));
+            _bookings.Add(new Booking(
+                Guid.NewGuid()
+                ));
         }
 
         public Booking? GetById(Guid id)

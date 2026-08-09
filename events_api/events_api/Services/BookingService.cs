@@ -29,7 +29,7 @@ namespace events_api.Services
 
                 _eventService.Update(eventId, eventExists);
 
-                var booking = new Booking { EventId = eventId };
+                var booking = new Booking (eventId);
                 _bookingRepository.Add(booking);
                 return booking;
             }
