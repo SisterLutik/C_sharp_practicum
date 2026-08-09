@@ -22,9 +22,10 @@ namespace events_api.Controllers
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(BookingResponse), 200)]
         [ProducesResponseType(404)]
-        public IActionResult GetById(Guid id)
+        public async Task<IActionResult> GetById(Guid id)
         {
-            var booking = _bookingService.GetBookingById(id);
+            // ✅ Используем правильное имя метода
+            var booking = await _bookingService.GetBookingByIdAsync(id);
 
             if (booking == null)
                 throw new BusinessException($"Бронь с id {id} не найдена", 404);

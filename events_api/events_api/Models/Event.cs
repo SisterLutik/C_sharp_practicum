@@ -15,7 +15,7 @@ namespace events_api.Models
             EndAt = endAt;
             TotalSeats = totalSeats;
             AvailableSeats = totalSeats;
-            Bookings = new List<Booking>();  // ✅ Инициализация коллекции
+            Bookings = new List<Booking>();
         }
 
         public Guid Id { get; internal set; }
@@ -36,8 +36,17 @@ namespace events_api.Models
 
         public int AvailableSeats { get; internal set; }
 
-        // ✅ Навигационное свойство: событие → брони
         public ICollection<Booking> Bookings { get; internal set; } = new List<Booking>();
+
+        // ✅ Метод для обновления
+        public void UpdateDetails(string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
+        {
+            Title = title ?? throw new ArgumentNullException(nameof(title));
+            Description = description;
+            StartAt = startAt;
+            EndAt = endAt;
+            TotalSeats = totalSeats;
+        }
 
         public bool TryReserveSeats(int count = 1)
         {

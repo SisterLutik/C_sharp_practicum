@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace events_api.DataAccess
 {
-    internal sealed class AppDbContext : DbContext
+    public sealed class AppDbContext : DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -12,7 +12,6 @@ namespace events_api.DataAccess
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Автоматически подключает все конфигурации из сборки
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         }
     }

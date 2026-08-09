@@ -84,7 +84,7 @@ namespace events_api.Services
                     var eventService = scope.ServiceProvider.GetRequiredService<IEventService>();
                     var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
 
-                    var eventExists = eventService.GetById(booking.EventId);
+                    var eventExists = await eventService.GetByIdAsync(booking.EventId);
 
                     if (eventExists == null)
                     {
@@ -119,11 +119,11 @@ namespace events_api.Services
                     var eventService = scopeFallback.ServiceProvider.GetRequiredService<IEventService>();
                     var bookingRepository = scopeFallback.ServiceProvider.GetRequiredService<IBookingRepository>();
 
-                    var eventExists = eventService.GetById(booking.EventId);
+                    var eventExists = await eventService.GetByIdAsync(booking.EventId);
                     if (eventExists != null)
                     {
                         eventExists.ReleaseSeats();
-                        eventService.Update(booking.EventId, eventExists);
+                        await eventService.UpdateAsync(booking.EventId, eventExists);
                     }
 
                     booking.Reject();

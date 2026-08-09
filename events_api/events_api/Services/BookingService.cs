@@ -1,46 +1,58 @@
 ﻿using events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
+using events_api.DataAccess;
+using Microsoft.EntityFrameworkCore;
 
 namespace events_api.Services
 {
     public class BookingService : IBookingService
     {
-        private readonly IBookingRepository _bookingRepository;
-        private readonly IEventService _eventService;
-        private static readonly object _bookingLock = new();  // ← static!
+        private readonly AppDbContext _context;
+        private readonly ILogger<BookingService> _logger;
+        private static readonly SemaphoreSlim _bookingSemaphore = new(1, 1);
 
-        public BookingService(IBookingRepository bookingRepository, IEventService eventService)
+        public BookingService(AppDbContext context, ILogger<BookingService> logger)
         {
-            _bookingRepository = bookingRepository;
-            _eventService = eventService;
+            _context = context;
+            _logger = logger;
         }
 
-        public Booking CreateBooking(Guid eventId)
+        public async Task<Booking> CreateBookingAsync(Guid eventId)
         {
-            lock (_bookingLock)  // ← общий для всех запросов
+            await _bookingSemaphore.WaitAsync();
+
+            try
             {
-                var eventExists = _eventService.GetById(eventId);
+                var eventExists = await _context.Events
+                    .FirstOrDefaultAsync(e => e.Id == eventId);
+
                 if (eventExists == null)
                     throw new BusinessException($"Событие с id {eventId} не найдено", 404);
 
                 if (!eventExists.TryReserveSeats())
                     throw new NoAvailableSeatsException("No available seats for this event");
 
-                _eventService.Update(eventId, eventExists);
+                var booking = new Booking(eventId);
+                await _context.Bookings.AddAsync(booking);
 
-                var booking = new Booking (eventId);
-                _bookingRepository.Add(booking);
+                // ✅ Один вызов сохраняет и бронь, и изменение AvailableSeats
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"Создана бронь {booking.Id} для события {eventId}");
                 return booking;
+            }
+            finally
+            {
+                _bookingSemaphore.Release();
             }
         }
 
-        public Booking? GetBookingById(Guid bookingId)
+        public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
         {
-            var booking = _bookingRepository.GetById(bookingId);
-            if (booking == null)
-                throw new BusinessException($"Бронь с id {bookingId} не найдена", 404);
-            return booking;
+            return await _context.Bookings
+                .Include(b => b.Event)
+                .FirstOrDefaultAsync(b => b.Id == bookingId);
         }
     }
 }

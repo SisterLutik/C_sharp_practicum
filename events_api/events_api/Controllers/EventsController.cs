@@ -21,7 +21,7 @@ namespace events_api.Controllers
         [HttpGet]
         [ProducesResponseType(typeof(PaginatedResult<Event>), 200)]
         [ProducesResponseType(400)]
-        public IActionResult GetAll(
+        public async Task<IActionResult> GetAll(
             [FromQuery] string? title,
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to,
@@ -37,16 +37,18 @@ namespace events_api.Controllers
             if (from.HasValue && to.HasValue && from > to)
                 throw new BusinessException("Дата начала (from) не может быть позже даты окончания (to)", 400);
 
-            var result = _eventService.GetAll(title, from, to, page, pageSize);
+            // ✅ Используем GetAllAsync
+            var result = await _eventService.GetAllAsync(title, from, to, page, pageSize);
             return Ok(result);
         }
 
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(Event), 200)]
         [ProducesResponseType(404)]
-        public IActionResult GetById(Guid id)
+        public async Task<IActionResult> GetById(Guid id)
         {
-            var eventItem = _eventService.GetById(id);
+            // ✅ Используем GetByIdAsync
+            var eventItem = await _eventService.GetByIdAsync(id);
 
             if (eventItem == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
@@ -57,7 +59,7 @@ namespace events_api.Controllers
         [HttpPost]
         [ProducesResponseType(typeof(Event), 201)]
         [ProducesResponseType(400)]
-        public IActionResult Create([FromBody] CreateEventRequest request)
+        public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
         {
             if (!ModelState.IsValid)
                 throw new BusinessException("Ошибка валидации модели", 400);
@@ -65,7 +67,8 @@ namespace events_api.Controllers
             if (request.EndAt <= request.StartAt)
                 throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
-            var newEvent = _eventService.CreateEvent(
+            // ✅ Используем CreateEventAsync (уже правильно)
+            var newEvent = await _eventService.CreateEventAsync(
                 request.Title,
                 request.Description,
                 request.StartAt,
@@ -80,7 +83,7 @@ namespace events_api.Controllers
         [ProducesResponseType(typeof(Event), 200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(404)]
-        public IActionResult Update(Guid id, [FromBody] Event updatedEvent)
+        public async Task<IActionResult> Update(Guid id, [FromBody] Event updatedEvent)
         {
             if (id != updatedEvent.Id)
                 throw new BusinessException("Id в URL не совпадает с Id в теле запроса", 400);
@@ -88,45 +91,35 @@ namespace events_api.Controllers
             if (!ModelState.IsValid)
                 throw new BusinessException("Ошибка валидации модели", 400);
 
-            var existingEvent = _eventService.GetById(id);
-            if (existingEvent == null)
-                throw new BusinessException($"Событие с id {id} не найдено", 404);
-
-            if (updatedEvent.EndAt <= updatedEvent.StartAt)
-                throw new BusinessException("EndAt должен быть позже StartAt", 400);
-
-            _eventService.Update(id, updatedEvent);
-            return Ok(_eventService.GetById(id));
+            // ✅ Используем UpdateAsync
+            var result = await _eventService.UpdateAsync(id, updatedEvent);
+            return Ok(result);
         }
 
         [HttpDelete("{id}")]
         [ProducesResponseType(204)]
         [ProducesResponseType(404)]
-        public IActionResult Delete(Guid id)
+        public async Task<IActionResult> Delete(Guid id)
         {
-            var existingEvent = _eventService.GetById(id);
-            if (existingEvent == null)
-                throw new BusinessException($"Событие с id {id} не найдено", 404);
-
-            _eventService.Delete(id);
+            // ✅ Используем DeleteAsync
+            await _eventService.DeleteAsync(id);
             return NoContent();
         }
 
-        /// <summary>
-        /// POST /api/events/{id}/book — создать бронь для события
-        /// </summary>
         [HttpPost("{id}/book")]
         [ProducesResponseType(typeof(BookingResponse), 202)]
         [ProducesResponseType(400)]
         [ProducesResponseType(404)]
         [ProducesResponseType(409)]
-        public IActionResult CreateBooking(Guid id)
+        public async Task<IActionResult> CreateBooking(Guid id)
         {
-            var eventExists = _eventService.GetById(id);
+            // ✅ Используем GetByIdAsync
+            var eventExists = await _eventService.GetByIdAsync(id);
             if (eventExists == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
-            var booking = _bookingService.CreateBooking(id);
+            // ✅ Используем CreateBookingAsync
+            var booking = await _bookingService.CreateBookingAsync(id);
 
             var response = new BookingResponse
             {
@@ -142,6 +135,5 @@ namespace events_api.Controllers
                 response
             );
         }
-
     }
 }
