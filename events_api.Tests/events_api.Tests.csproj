@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\events_api\events_api\events_api.csproj"  />
+    <ProjectReference Include="..\events_api\events_api\events_api.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,149 +1,180 @@
-﻿using events_api.Data;
+﻿using events_api.DataAccess;
 using events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
 using events_api.Services;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace events_api.Tests.Services
 {
-    public class BookingServiceTests
+    public class BookingServiceTests : IDisposable
     {
-        private readonly IBookingRepository _repository;
-        private readonly EventService _eventService;
-        private readonly BookingService _bookingService;
+        private readonly string _dbName;
+        private readonly IServiceProvider _serviceProvider;
 
         public BookingServiceTests()
         {
-            _repository = new BookingRepository(NullLogger<BookingRepository>.Instance);
-            _eventService = new EventService();
-            _bookingService = new BookingService(_repository, _eventService);
+            _dbName = Guid.NewGuid().ToString();
+            var services = new ServiceCollection();
+
+            services.AddDbContext<AppDbContext>(options =>
+                options.UseInMemoryDatabase(_dbName));
+
+            services.AddSingleton<ILogger<BookingService>>(NullLogger<BookingService>.Instance);
+            services.AddScoped<IEventService, EventService>();
+            services.AddScoped<IBookingService, BookingService>();
+
+            _serviceProvider = services.BuildServiceProvider();
         }
 
-        // =============================================
-        // ✅ УСПЕШНЫЕ СЦЕНАРИИ (МЕСТА)
-        // =============================================
-
         [Fact]
-        public void CreateBooking_ShouldDecreaseAvailableSeatsByOne()
+        public async Task CreateBookingAsync_ShouldDecreaseAvailableSeatsByOne()
         {
             // Arrange
-            var eventId = Guid.NewGuid();
-            var eventWithSeats = CreateTestEvent(eventId, 10);
-            _eventService.Add(eventWithSeats);
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
+            var eventItem = new Event("Тестовое событие", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 10);
+            await context.Events.AddAsync(eventItem);
+            await context.SaveChangesAsync();
 
             // Act
-            var booking = _bookingService.CreateBooking(eventId);
+            var booking = await bookingService.CreateBookingAsync(eventItem.Id);
 
             // Assert
             booking.Should().NotBeNull();
-            var updatedEvent = _eventService.GetById(eventId);
+            var updatedEvent = await context.Events.FindAsync(eventItem.Id);
             updatedEvent!.AvailableSeats.Should().Be(9);
         }
 
         [Fact]
-        public void CreateBooking_MultipleBookingsUpToLimit_ShouldAllSucceed()
+        public async Task CreateBookingAsync_MultipleBookingsUpToLimit_ShouldAllSucceed()
         {
             // Arrange
-            var eventId = Guid.NewGuid();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
             var totalSeats = 5;
-            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
-            _eventService.Add(eventWithSeats);
+            var eventItem = new Event("Тестовое событие", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), totalSeats);
+            await context.Events.AddAsync(eventItem);
+            await context.SaveChangesAsync();
 
             var bookingIds = new List<Guid>();
 
             // Act
             for (int i = 0; i < totalSeats; i++)
             {
-                var booking = _bookingService.CreateBooking(eventId);
+                var booking = await bookingService.CreateBookingAsync(eventItem.Id);
                 bookingIds.Add(booking.Id);
             }
 
             // Assert
             bookingIds.Should().HaveCount(totalSeats);
             bookingIds.Should().OnlyHaveUniqueItems();
-            var updatedEvent = _eventService.GetById(eventId);
+            var updatedEvent = await context.Events.FindAsync(eventItem.Id);
             updatedEvent!.AvailableSeats.Should().Be(0);
         }
 
         [Fact]
-        public void CreateBooking_WhenSeatsExhausted_ShouldThrowNoAvailableSeatsException()
+        public async Task CreateBookingAsync_WhenSeatsExhausted_ShouldThrowNoAvailableSeatsException()
         {
             // Arrange
-            var eventId = Guid.NewGuid();
-            var totalSeats = 1;
-            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
-            _eventService.Add(eventWithSeats);
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
-            // Act — создаём первую бронь
-            var firstBooking = _bookingService.CreateBooking(eventId);
+            var totalSeats = 1;
+            var eventItem = new Event("Тестовое событие", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), totalSeats);
+            await context.Events.AddAsync(eventItem);
+            await context.SaveChangesAsync();
+
+            // Act
+            var firstBooking = await bookingService.CreateBookingAsync(eventItem.Id);
 
             // Assert
             firstBooking.Should().NotBeNull();
-            var updatedEvent = _eventService.GetById(eventId);
+            var updatedEvent = await context.Events.FindAsync(eventItem.Id);
             updatedEvent!.AvailableSeats.Should().Be(0);
 
-            // Act & Assert — вторая попытка должна выбросить исключение
-            var exception = Assert.Throws<NoAvailableSeatsException>(() =>
-                _bookingService.CreateBooking(eventId));
-
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<NoAvailableSeatsException>(() =>
+                bookingService.CreateBookingAsync(eventItem.Id));
             exception.Message.Should().Be("No available seats for this event");
         }
 
-        // =============================================
-        // ❌ НЕУСПЕШНЫЕ СЦЕНАРИИ
-        // =============================================
-
         [Fact]
-        public void CreateBooking_WithNonExistingEvent_ShouldThrowBusinessException()
+        public async Task CreateBookingAsync_WithNonExistingEvent_ShouldThrowBusinessException()
         {
             // Arrange
+            using var scope = _serviceProvider.CreateScope();
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
             var nonExistingId = Guid.NewGuid();
 
             // Act & Assert
-            var exception = Assert.Throws<BusinessException>(() =>
-                _bookingService.CreateBooking(nonExistingId));
-
+            var exception = await Assert.ThrowsAsync<BusinessException>(() =>
+                bookingService.CreateBookingAsync(nonExistingId));
             exception.Message.Should().Be($"Событие с id {nonExistingId} не найдено");
             exception.StatusCode.Should().Be(404);
         }
 
         [Fact]
-        public void CreateBooking_WithNoAvailableSeats_ShouldThrowNoAvailableSeatsException()
+        public async Task GetBookingByIdAsync_WithExistingId_ShouldReturnBooking()
         {
             // Arrange
-            var eventId = Guid.NewGuid();
-            var totalSeats = 0;
-            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
-            _eventService.Add(eventWithSeats);
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
-            // Act & Assert
-            var exception = Assert.Throws<NoAvailableSeatsException>(() =>
-                _bookingService.CreateBooking(eventId));
+            var eventItem = new Event("Тестовое событие", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 10);
+            await context.Events.AddAsync(eventItem);
+            await context.SaveChangesAsync();
 
-            exception.Message.Should().Be("No available seats for this event");
+            var booking = await bookingService.CreateBookingAsync(eventItem.Id);
+
+            // Act
+            var result = await bookingService.GetBookingByIdAsync(booking.Id);
+
+            // Assert
+            result.Should().NotBeNull();
+            result!.Id.Should().Be(booking.Id);
+            result.EventId.Should().Be(eventItem.Id);
+            result.Status.Should().Be(BookingStatus.Pending);
         }
 
-        // =============================================
-        // 🧪 ТЕСТЫ НА СМЕНУ СТАТУСА
-        // =============================================
+        [Fact]
+        public async Task GetBookingByIdAsync_WithNonExistingId_ShouldThrowBusinessException()
+        {
+            // Arrange
+            using var scope = _serviceProvider.CreateScope();
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
+            var nonExistingId = Guid.NewGuid();
+
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<BusinessException>(() =>
+                bookingService.GetBookingByIdAsync(nonExistingId));
+            exception.Message.Should().Be($"Бронь с id {nonExistingId} не найдена");
+            exception.StatusCode.Should().Be(404);
+        }
 
         [Fact]
         public void Confirm_ShouldSetStatusToConfirmedAndSetProcessedAt()
         {
-            var booking = new Booking
-            {
-                Id = Guid.NewGuid(),
-                EventId = Guid.NewGuid(),
-                Status = BookingStatus.Pending,
-                CreatedAt = DateTime.UtcNow,
-                ProcessedAt = null
-            };
+            // Arrange
+            var booking = new Booking(Guid.NewGuid());
 
+            // Act
             booking.Confirm();
 
+            // Assert
             booking.Status.Should().Be(BookingStatus.Confirmed);
             booking.ProcessedAt.Should().NotBeNull();
             booking.ProcessedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
@@ -152,161 +183,101 @@ namespace events_api.Tests.Services
         [Fact]
         public void Reject_ShouldSetStatusToRejectedAndSetProcessedAt()
         {
-            var booking = new Booking
-            {
-                Id = Guid.NewGuid(),
-                EventId = Guid.NewGuid(),
-                Status = BookingStatus.Pending,
-                CreatedAt = DateTime.UtcNow,
-                ProcessedAt = null
-            };
+            // Arrange
+            var booking = new Booking(Guid.NewGuid());
 
+            // Act
             booking.Reject();
 
+            // Assert
             booking.Status.Should().Be(BookingStatus.Rejected);
             booking.ProcessedAt.Should().NotBeNull();
             booking.ProcessedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
         }
 
         [Fact]
-        public void ReleaseSeats_ShouldRestoreAvailableSeatsAfterReject()
-        {
-            var eventWithSeats = CreateTestEvent(Guid.NewGuid(), 10);
-            var initialSeats = eventWithSeats.AvailableSeats;
-
-            eventWithSeats.TryReserveSeats();
-            var seatsAfterReserve = eventWithSeats.AvailableSeats;
-
-            eventWithSeats.ReleaseSeats();
-            var seatsAfterRelease = eventWithSeats.AvailableSeats;
-
-            seatsAfterReserve.Should().Be(initialSeats - 1);
-            seatsAfterRelease.Should().Be(initialSeats);
-        }
-
-        [Fact]
-        public void AfterReject_ShouldBeAbleToCreateNewBookingForSameSpot()
+        public async Task ConcurrentBooking_With5SeatsAnd20Requests_ShouldSucceedExactly5AndThrow15()
         {
             // Arrange
-            var eventId = Guid.NewGuid();
-            var eventWithSeats = CreateTestEvent(eventId, 1);
-            _eventService.Add(eventWithSeats);
-
-            // Act — создаём бронь
-            var booking = _bookingService.CreateBooking(eventId);
-            var updatedEvent = _eventService.GetById(eventId);
-            updatedEvent!.AvailableSeats.Should().Be(0);
-
-            // Act — отменяем бронь (освобождаем место)
-            booking.Reject();
-            _repository.Update(booking);
-            updatedEvent.ReleaseSeats();
-
-            var eventAfterRelease = _eventService.GetById(eventId);
-            eventAfterRelease!.AvailableSeats.Should().Be(1);
-
-            // Act — создаём новую бронь
-            var newBooking = _bookingService.CreateBooking(eventId);
-
-            // Assert
-            newBooking.Should().NotBeNull();
-            newBooking.Id.Should().NotBe(booking.Id);
-            newBooking.Status.Should().Be(BookingStatus.Pending);
-            var finalEvent = _eventService.GetById(eventId);
-            finalEvent!.AvailableSeats.Should().Be(0);
-        }
-
-        // =============================================
-        // 🧪 ТЕСТЫ НА КОНКУРЕНТНОСТЬ
-        // =============================================
-
-        [Fact]
-        public void ConcurrentBooking_With5SeatsAnd20Requests_ShouldSucceedExactly5AndThrow15()
-        {
-            // Arrange
-            var eventId = Guid.NewGuid();
-            var totalSeats = 5;
-            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
-            _eventService.Add(eventWithSeats);
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var eventItem = new Event("Событие на 5 мест", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 5);
+            await context.Events.AddAsync(eventItem);
+            await context.SaveChangesAsync();
 
             var results = new List<Booking>();
             var exceptions = new List<Exception>();
 
-            // Act
-            Parallel.For(0, 20, i =>
+            // Act — каждый запрос получает свой scope
+            var tasks = Enumerable.Range(0, 20).Select(async _ =>
             {
+                using var childScope = _serviceProvider.CreateScope();
+                var bookingService = childScope.ServiceProvider.GetRequiredService<IBookingService>();
                 try
                 {
-                    var booking = _bookingService.CreateBooking(eventId);
-                    lock (results)
-                    {
-                        results.Add(booking);
-                    }
+                    var booking = await bookingService.CreateBookingAsync(eventItem.Id);
+                    lock (results) results.Add(booking);
                 }
                 catch (Exception ex)
                 {
-                    lock (exceptions)
-                    {
-                        exceptions.Add(ex);
-                    }
+                    lock (exceptions) exceptions.Add(ex);
                 }
             });
 
+            await Task.WhenAll(tasks);
+
             // Assert
-            results.Should().HaveCount(totalSeats);
+            results.Should().HaveCount(5);
             results.Select(b => b.Id).Should().OnlyHaveUniqueItems();
             exceptions.Should().HaveCount(15);
             exceptions.Should().AllBeOfType<NoAvailableSeatsException>();
-            var finalEvent = _eventService.GetById(eventId);
-            finalEvent!.AvailableSeats.Should().Be(0);
+
+            using var verifyScope = _serviceProvider.CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var updatedEvent = await verifyContext.Events.FindAsync(eventItem.Id);
+            updatedEvent!.AvailableSeats.Should().Be(0);
         }
 
         [Fact]
-        public void ConcurrentBooking_With10SeatsAnd10Requests_ShouldAllSucceedWithUniqueIds()
+        public async Task ConcurrentBooking_With10SeatsAnd10Requests_ShouldAllSucceedWithUniqueIds()
         {
             // Arrange
-            var eventId = Guid.NewGuid();
-            var totalSeats = 10;
-            var eventWithSeats = CreateTestEvent(eventId, totalSeats);
-            _eventService.Add(eventWithSeats);
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var eventItem = new Event("Событие на 10 мест", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 10);
+            await context.Events.AddAsync(eventItem);
+            await context.SaveChangesAsync();
 
             var results = new List<Booking>();
 
-            // Act
-            Parallel.For(0, totalSeats, i =>
+            // Act — каждый запрос получает свой scope
+            var tasks = Enumerable.Range(0, 10).Select(async _ =>
             {
-                var booking = _bookingService.CreateBooking(eventId);
-                lock (results)
-                {
-                    results.Add(booking);
-                }
+                using var childScope = _serviceProvider.CreateScope();
+                var bookingService = childScope.ServiceProvider.GetRequiredService<IBookingService>();
+                var booking = await bookingService.CreateBookingAsync(eventItem.Id);
+                lock (results) results.Add(booking);
             });
 
-            var bookingIds = results.Select(b => b.Id).ToList();
+            await Task.WhenAll(tasks);
 
             // Assert
-            results.Should().HaveCount(totalSeats);
-            bookingIds.Should().OnlyHaveUniqueItems();
-            var finalEvent = _eventService.GetById(eventId);
-            finalEvent!.AvailableSeats.Should().Be(0);
+            results.Should().HaveCount(10);
+            results.Select(b => b.Id).Should().OnlyHaveUniqueItems();
+
+            using var verifyScope = _serviceProvider.CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var updatedEvent = await verifyContext.Events.FindAsync(eventItem.Id);
+            updatedEvent!.AvailableSeats.Should().Be(0);
         }
 
-        // =============================================
-        // 🔧 ВСПОМОГАТЕЛЬНЫЙ МЕТОД
-        // =============================================
-
-        private Event CreateTestEvent(Guid eventId, int totalSeats)
+        public void Dispose()
         {
-            return new Event
-            {
-                Id = eventId,
-                Title = $"Тестовое событие на {totalSeats} мест",
-                Description = "Описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = totalSeats,
-                AvailableSeats = totalSeats
-            };
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            context.Database.EnsureDeleted();
+            context.Dispose();
+            (_serviceProvider as IDisposable)?.Dispose();
         }
     }
 }

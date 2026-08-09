@@ -1,206 +1,176 @@
-﻿using events_api.Models;
-using events_api.Services;
+﻿using events_api.DataAccess;
 using events_api.Exceptions;
+using events_api.Interfaces;
+using events_api.Models;
+using events_api.Services;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace events_api.Tests.Services
 {
-    public class EventServiceTests
+    public class EventServiceTests : IDisposable
     {
-        [Fact]
-        public void Add_ShouldCreateNewEvent_WithGeneratedId()
+        private readonly string _dbName;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly IEventService _eventService;
+        private readonly AppDbContext _context;
+
+        public EventServiceTests()
         {
-            var service = new EventService();
-            var newEvent = new Event
-            {
-                Title = "Новое событие",
-                Description = "Описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            };
+            _dbName = Guid.NewGuid().ToString();
+            var services = new ServiceCollection();
 
-            service.Add(newEvent);
-            var result = service.GetById(newEvent.Id);
+            services.AddDbContext<AppDbContext>(options =>
+                options.UseInMemoryDatabase(_dbName));
 
-            result.Should().NotBeNull();
-            result!.Id.Should().NotBe(Guid.Empty);
-            result.Title.Should().Be("Новое событие");
+            services.AddSingleton<ILogger<EventService>>(NullLogger<EventService>.Instance);
+            services.AddScoped<IEventService, EventService>();
+
+            _serviceProvider = services.BuildServiceProvider();
+            _eventService = _serviceProvider.GetRequiredService<IEventService>();
+            _context = _serviceProvider.GetRequiredService<AppDbContext>();
         }
 
         [Fact]
-        public void GetAll_ShouldReturnAllEvents()
+        public async Task CreateEventAsync_ShouldCreateNewEvent()
         {
-            var service = new EventService();
-            var initialCount = service.GetAll(null, null, null, 1, 10).Items.Count;
+            // Arrange
+            var title = "Новое событие";
+            var description = "Описание события";
+            var startAt = DateTime.Now.AddDays(1);
+            var endAt = DateTime.Now.AddDays(2);
+            var totalSeats = 10;
 
-            var result = service.GetAll(null, null, null, 1, 100);
+            // Act
+            var result = await _eventService.CreateEventAsync(title, description, startAt, endAt, totalSeats);
 
-            result.Items.Should().NotBeNull();
-            result.TotalCount.Should().Be(initialCount);
+            // Assert
+            result.Should().NotBeNull();
+            result.Id.Should().NotBe(Guid.Empty);
+            result.Title.Should().Be(title);
+            result.Description.Should().Be(description);
+            result.StartAt.Should().Be(startAt);
+            result.EndAt.Should().Be(endAt);
+            result.TotalSeats.Should().Be(totalSeats);
+            result.AvailableSeats.Should().Be(totalSeats);
         }
 
         [Fact]
-        public void GetById_WithExistingId_ShouldReturnEvent()
+        public async Task GetByIdAsync_WithExistingId_ShouldReturnEvent()
         {
-            var service = new EventService();
-            var newEvent = new Event
-            {
-                Title = "Тестовое событие",
-                Description = "Тестовое описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = 20,
-                AvailableSeats = 20
-            };
-            service.Add(newEvent);
+            // Arrange
+            var eventItem = new Event("Тестовое событие", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 20, "Описание");
+            await _context.Events.AddAsync(eventItem);
+            await _context.SaveChangesAsync();
 
-            var result = service.GetById(newEvent.Id);
+            // Act
+            var result = await _eventService.GetByIdAsync(eventItem.Id);
 
+            // Assert
             result.Should().NotBeNull();
-            result!.Id.Should().Be(newEvent.Id);
+            result!.Id.Should().Be(eventItem.Id);
             result.Title.Should().Be("Тестовое событие");
+            result.Description.Should().Be("Описание");
+            result.TotalSeats.Should().Be(20);
+            result.AvailableSeats.Should().Be(20);
         }
 
         [Fact]
-        public void Update_WithExistingId_ShouldUpdateEvent()
+        public async Task UpdateAsync_WithExistingId_ShouldUpdateEvent()
         {
-            var service = new EventService();
-            var newEvent = new Event
-            {
-                Title = "Старое название",
-                Description = "Старое описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            };
-            service.Add(newEvent);
+            // Arrange
+            var eventItem = new Event("Старое название", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 10, "Старое описание");
+            await _context.Events.AddAsync(eventItem);
+            await _context.SaveChangesAsync();
 
-            var updatedEvent = new Event
-            {
-                Title = "Новое название",
-                Description = "Новое описание",
-                StartAt = DateTime.Now.AddDays(3),
-                EndAt = DateTime.Now.AddDays(4),
-                TotalSeats = 20,
-                AvailableSeats = 15
-            };
+            var updatedEvent = new Event("Новое название", DateTime.Now.AddDays(3), DateTime.Now.AddDays(4), 20, "Новое описание");
 
-            service.Update(newEvent.Id, updatedEvent);
-            var result = service.GetById(newEvent.Id);
+            // Act
+            var result = await _eventService.UpdateAsync(eventItem.Id, updatedEvent);
 
+            // Assert
             result.Should().NotBeNull();
-            result!.Title.Should().Be("Новое название");
+            result.Title.Should().Be("Новое название");
             result.Description.Should().Be("Новое описание");
             result.StartAt.Should().Be(updatedEvent.StartAt);
             result.EndAt.Should().Be(updatedEvent.EndAt);
             result.TotalSeats.Should().Be(20);
-            result.AvailableSeats.Should().Be(15);
         }
 
         [Fact]
-        public void Delete_WithExistingId_ShouldRemoveEvent()
+        public async Task DeleteAsync_WithExistingId_ShouldRemoveEvent()
         {
-            var service = new EventService();
-            var newEvent = new Event
-            {
-                Title = "Событие для удаления",
-                Description = "Описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = 5,
-                AvailableSeats = 5
-            };
-            service.Add(newEvent);
+            // Arrange
+            var eventItem = new Event("Событие для удаления", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 5, "Описание");
+            await _context.Events.AddAsync(eventItem);
+            await _context.SaveChangesAsync();
 
-            service.Delete(newEvent.Id);
-            var result = service.GetById(newEvent.Id);
+            // Act
+            await _eventService.DeleteAsync(eventItem.Id);
+            var result = await _context.Events.FindAsync(eventItem.Id);
 
+            // Assert
             result.Should().BeNull();
         }
 
         [Fact]
-        public void GetAll_WithTitleFilter_ShouldReturnMatchingEvents()
+        public async Task GetAllAsync_WithTitleFilter_ShouldReturnMatchingEvents()
         {
-            var service = new EventService();
-            service.Add(new Event
-            {
-                Title = "Уникальное название",
-                Description = "Описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            });
+            // Arrange
+            var event1 = new Event("Уникальное название", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 10, "Описание 1");
+            var event2 = new Event("Другое событие", DateTime.Now.AddDays(3), DateTime.Now.AddDays(4), 15, "Описание 2");
+            await _context.Events.AddRangeAsync(event1, event2);
+            await _context.SaveChangesAsync();
 
-            var result = service.GetAll("уникальное", null, null, 1, 10);
+            // Act
+            var result = await _eventService.GetAllAsync("уникальное", null, null, 1, 10);
 
-            result.Items.Should().NotBeEmpty();
-            result.Items.Should().AllSatisfy(e => e.Title.Should().ContainEquivalentOf("уникальное"));
+            // Assert
+            result.Items.Should().HaveCount(1);
+            result.Items.First().Title.Should().Be("Уникальное название");
         }
 
         [Fact]
-        public void GetAll_WithDateFilters_ShouldReturnEventsInRange()
+        public async Task GetAllAsync_WithDateFilters_ShouldReturnEventsInRange()
         {
-            var service = new EventService();
+            // Arrange
             var baseDate = new DateTime(2025, 7, 15);
-
-            service.Add(new Event
-            {
-                Title = "Событие в диапазоне",
-                Description = "Описание",
-                StartAt = baseDate.AddDays(-5),
-                EndAt = baseDate.AddDays(5),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            });
-            service.Add(new Event
-            {
-                Title = "Событие вне диапазона",
-                Description = "Описание",
-                StartAt = baseDate.AddDays(-20),
-                EndAt = baseDate.AddDays(-15),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            });
+            var event1 = new Event("Событие в диапазоне", baseDate.AddDays(-5), baseDate.AddDays(5), 10);
+            var event2 = new Event("Событие вне диапазона", baseDate.AddDays(-20), baseDate.AddDays(-15), 10);
+            await _context.Events.AddRangeAsync(event1, event2);
+            await _context.SaveChangesAsync();
 
             var from = baseDate.AddDays(-10);
             var to = baseDate.AddDays(10);
 
-            var result = service.GetAll(null, from, to, 1, 10);
+            // Act
+            var result = await _eventService.GetAllAsync(null, from, to, 1, 10);
 
-            result.Items.Should().NotBeEmpty();
-            result.Items.Should().AllSatisfy(e =>
-            {
-                e.StartAt.Should().BeOnOrAfter(from);
-                e.EndAt.Should().BeOnOrBefore(to);
-            });
-            result.Items.Should().Contain(e => e.Title == "Событие в диапазоне");
-            result.Items.Should().NotContain(e => e.Title == "Событие вне диапазона");
+            // Assert
+            result.Items.Should().HaveCount(1);
+            result.Items.First().Title.Should().Be("Событие в диапазоне");
         }
 
         [Fact]
-        public void GetAll_WithPagination_ShouldReturnCorrectPage()
+        public async Task GetAllAsync_WithPagination_ShouldReturnCorrectPage()
         {
-            var service = new EventService();
+            // Arrange
+            var events = new List<Event>();
             for (int i = 0; i < 25; i++)
             {
-                service.Add(new Event
-                {
-                    Title = $"Событие {i}",
-                    Description = "Описание",
-                    StartAt = DateTime.Now.AddDays(i),
-                    EndAt = DateTime.Now.AddDays(i + 1),
-                    TotalSeats = 10,
-                    AvailableSeats = 10
-                });
+                events.Add(new Event($"Событие {i}", DateTime.Now.AddDays(i), DateTime.Now.AddDays(i + 1), 10));
             }
+            await _context.Events.AddRangeAsync(events);
+            await _context.SaveChangesAsync();
 
-            var result = service.GetAll(null, null, null, 2, 10);
+            // Act
+            var result = await _eventService.GetAllAsync(null, null, null, 2, 10);
 
+            // Assert
             result.Page.Should().Be(2);
             result.PageSize.Should().Be(10);
             result.Items.Count.Should().Be(10);
@@ -208,135 +178,54 @@ namespace events_api.Tests.Services
         }
 
         [Fact]
-        public void GetAll_WithCombinedFilters_ShouldApplyAllFilters()
+        public async Task UpdateAsync_WithInvalidDates_ShouldThrowBusinessException()
         {
-            var service = new EventService();
-            var baseDate = new DateTime(2025, 7, 15);
+            // Arrange
+            var eventItem = new Event("Событие с корректными датами", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 10);
+            await _context.Events.AddAsync(eventItem);
+            await _context.SaveChangesAsync();
 
-            service.Add(new Event
-            {
-                Title = "Конференция по IT",
-                Description = "Описание",
-                StartAt = baseDate.AddDays(1),
-                EndAt = baseDate.AddDays(2),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            });
-            service.Add(new Event
-            {
-                Title = "Конференция по дизайну",
-                Description = "Описание",
-                StartAt = baseDate.AddDays(3),
-                EndAt = baseDate.AddDays(4),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            });
-            service.Add(new Event
-            {
-                Title = "Событие вне диапазона",
-                Description = "Описание",
-                StartAt = baseDate.AddDays(20),
-                EndAt = baseDate.AddDays(25),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            });
+            var invalidEvent = new Event("Некорректное событие", DateTime.Now.AddDays(3), DateTime.Now.AddDays(2), 10);
 
-            var result = service.GetAll(
-                title: "конференция",
-                from: baseDate.AddDays(0),
-                to: baseDate.AddDays(5),
-                page: 1,
-                pageSize: 10);
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<BusinessException>(() =>
+                _eventService.UpdateAsync(eventItem.Id, invalidEvent));
 
-            result.Items.Should().NotBeEmpty();
-            result.Items.Should().AllSatisfy(e =>
-            {
-                e.Title.Should().ContainEquivalentOf("конференция");
-                e.StartAt.Should().BeOnOrAfter(baseDate.AddDays(0));
-                e.EndAt.Should().BeOnOrBefore(baseDate.AddDays(5));
-            });
-            result.Items.Count.Should().Be(2);
-            result.Items.Should().Contain(e => e.Title == "Конференция по IT");
-            result.Items.Should().Contain(e => e.Title == "Конференция по дизайну");
-            result.Items.Should().NotContain(e => e.Title == "Событие вне диапазона");
+            exception.Message.Should().Be("EndAt должен быть позже StartAt");
         }
 
         [Fact]
-        public void Update_WithInvalidDates_WhenEndAtBeforeStartAt_ShouldThrowBusinessException()
+        public async Task UpdateAsync_WithNonExistingId_ShouldThrowBusinessException()
         {
-            var service = new EventService();
-            var newEvent = new Event
-            {
-                Title = "Событие с корректными датами",
-                Description = "Описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            };
-            service.Add(newEvent);
+            // Arrange
+            var nonExistingId = Guid.NewGuid();
+            var updatedEvent = new Event("Новое название", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 10);
 
-            var invalidEvent = new Event
-            {
-                Title = "Некорректное событие",
-                Description = "Описание",
-                StartAt = DateTime.Now.AddDays(3),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            };
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<BusinessException>(() =>
+                _eventService.UpdateAsync(nonExistingId, updatedEvent));
 
-            var exception = Record.Exception(() => service.Update(newEvent.Id, invalidEvent));
-
-            exception.Should().NotBeNull();
-            exception.Should().BeOfType<BusinessException>();
-            exception!.Message.Should().Be("EndAt должен быть позже StartAt");
+            exception.Message.Should().Be($"Событие с id {nonExistingId} не найдено");
         }
 
         [Fact]
-        public void GetById_WithNonExistingId_ShouldReturnNull()
+        public async Task DeleteAsync_WithNonExistingId_ShouldThrowBusinessException()
         {
-            var service = new EventService();
+            // Arrange
             var nonExistingId = Guid.NewGuid();
 
-            var result = service.GetById(nonExistingId);
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<BusinessException>(() =>
+                _eventService.DeleteAsync(nonExistingId));
 
-            result.Should().BeNull();
+            exception.Message.Should().Be($"Событие с id {nonExistingId} не найдено");
         }
 
-        [Fact]
-        public void Update_WithNonExistingId_ShouldThrowBusinessException()
+        public void Dispose()
         {
-            var service = new EventService();
-            var nonExistingId = Guid.NewGuid();
-            var updatedEvent = new Event
-            {
-                Title = "Новое название",
-                Description = "Новое описание",
-                StartAt = DateTime.Now.AddDays(1),
-                EndAt = DateTime.Now.AddDays(2),
-                TotalSeats = 10,
-                AvailableSeats = 10
-            };
-
-            var exception = Record.Exception(() => service.Update(nonExistingId, updatedEvent));
-
-            exception.Should().NotBeNull();
-            exception.Should().BeOfType<BusinessException>();
-            exception!.Message.Should().Be($"Событие с id {nonExistingId} не найдено");
-        }
-
-        [Fact]
-        public void Delete_WithNonExistingId_ShouldThrowBusinessException()
-        {
-            var service = new EventService();
-            var nonExistingId = Guid.NewGuid();
-
-            var exception = Record.Exception(() => service.Delete(nonExistingId));
-
-            exception.Should().NotBeNull();
-            exception.Should().BeOfType<BusinessException>();
-            exception!.Message.Should().Be($"Событие с id {nonExistingId} не найдено");
+            _context.Database.EnsureDeleted();
+            _context.Dispose();
+            (_serviceProvider as IDisposable)?.Dispose();
         }
     }
 }

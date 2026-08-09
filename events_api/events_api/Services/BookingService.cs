@@ -50,9 +50,14 @@ namespace events_api.Services
 
         public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
         {
-            return await _context.Bookings
+            var booking = await _context.Bookings
                 .Include(b => b.Event)
                 .FirstOrDefaultAsync(b => b.Id == bookingId);
+
+            if (booking == null)
+                throw new BusinessException($"Бронь с id {bookingId} не найдена", 404);
+
+            return booking;
         }
     }
 }
