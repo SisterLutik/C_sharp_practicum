@@ -1,5 +1,7 @@
 ﻿using events_api.Interfaces;
 using events_api.Models;
+using events_api.DataAccess;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -7,16 +9,15 @@ namespace events_api.Services
 {
     public class BookingBackgroundService : BackgroundService
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<BookingBackgroundService> _logger;
         private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(5);
-        private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
 
         public BookingBackgroundService(
-            IServiceProvider serviceProvider,
+            IServiceScopeFactory scopeFactory,
             ILogger<BookingBackgroundService> logger)
         {
-            _serviceProvider = serviceProvider;
+            _scopeFactory = scopeFactory;
             _logger = logger;
         }
 
@@ -43,102 +44,99 @@ namespace events_api.Services
 
         private async Task ProcessPendingBookings(CancellationToken stoppingToken)
         {
-            using var scope = _serviceProvider.CreateScope();
-            var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+            // ✅ Создаём scope для чтения Pending броней
+            using var readScope = _scopeFactory.CreateScope();
+            var dbContext = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var allBookings = bookingRepository.GetAll();
-            var pendingBookings = allBookings.Where(b => b.Status == BookingStatus.Pending).ToList();
+            var pendingBookingIds = await dbContext.Bookings
+                .Where(b => b.Status == BookingStatus.Pending)
+                .Select(b => b.Id)
+                .ToListAsync(stoppingToken);
 
-            if (!pendingBookings.Any())
+            if (!pendingBookingIds.Any())
                 return;
 
-            _logger.LogInformation($"Найдено {pendingBookings.Count} броней в статусе Pending");
+            _logger.LogInformation($"Найдено {pendingBookingIds.Count} броней в статусе Pending");
 
             // ✅ Каждая задача получает свой scope
-            var tasks = pendingBookings.Select(booking =>
-                ProcessBookingWithOwnScopeAsync(booking, stoppingToken));
+            var tasks = pendingBookingIds.Select(bookingId =>
+                ProcessBookingWithOwnScopeAsync(bookingId, stoppingToken));
 
             await Task.WhenAll(tasks);
         }
 
-        private async Task ProcessBookingWithOwnScopeAsync(Booking booking, CancellationToken stoppingToken)
+        private async Task ProcessBookingWithOwnScopeAsync(Guid bookingId, CancellationToken stoppingToken)
         {
-            using var scope = _serviceProvider.CreateScope();
-            await ProcessBookingAsync(booking, stoppingToken, scope);
-        }
+            // ✅ Создаём отдельный scope для каждой брони
+            using var scope = _scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<BookingBackgroundService>>();
 
-        private async Task ProcessBookingAsync(
-            Booking booking,
-            CancellationToken stoppingToken,
-            IServiceScope scope)
-        {
             try
             {
-                _logger.LogInformation($"Обработка брони #{booking.Id}...");
+                logger.LogInformation($"Обработка брони #{bookingId}...");
                 await Task.Delay(2000, stoppingToken);
 
-                await _processingSemaphore.WaitAsync(stoppingToken);
+                // Получаем бронь вместе со связанным событием
+                var booking = await dbContext.Bookings
+                    .Include(b => b.Event)
+                    .FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
 
-                try
+                if (booking == null)
                 {
-                    var eventService = scope.ServiceProvider.GetRequiredService<IEventService>();
-                    var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
-
-                    var eventExists = await eventService.GetByIdAsync(booking.EventId);
-
-                    if (eventExists == null)
-                    {
-                        booking.Reject();
-                        bookingRepository.Update(booking);
-                        _logger.LogWarning(
-                            $"Бронь #{booking.Id} отклонена: событие #{booking.EventId} не найдено. " +
-                            "Места не возвращаются, так как событие удалено.");
-                        return;
-                    }
-
-                    booking.Confirm();
-                    bookingRepository.Update(booking);
-                    _logger.LogInformation($"Бронь #{booking.Id} подтверждена. ProcessedAt: {booking.ProcessedAt}");
+                    logger.LogWarning($"Бронь #{bookingId} не найдена");
+                    return;
                 }
-                finally
+
+                if (booking.Status != BookingStatus.Pending)
                 {
-                    _processingSemaphore.Release();
+                    logger.LogInformation($"Бронь #{bookingId} уже обработана (статус: {booking.Status})");
+                    return;
                 }
+
+                // Проверяем, существует ли событие
+                if (booking.Event == null)
+                {
+                    booking.Reject();
+                    await dbContext.SaveChangesAsync(stoppingToken);
+                    logger.LogWarning($"Бронь #{bookingId} отклонена: событие не найдено");
+                    return;
+                }
+
+                // Подтверждаем бронь
+                booking.Confirm();
+                await dbContext.SaveChangesAsync(stoppingToken);
+                logger.LogInformation($"Бронь #{bookingId} подтверждена");
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning($"Обработка брони #{booking.Id} отменена");
+                logger.LogWarning($"Обработка брони #{bookingId} отменена");
             }
             catch (Exception ex)
             {
+                logger.LogError(ex, $"Ошибка при обработке брони #{bookingId}");
+
+                // Пытаемся отклонить бронь в случае ошибки
                 try
                 {
-                    await _processingSemaphore.WaitAsync(stoppingToken);
+                    var booking = await dbContext.Bookings
+                        .Include(b => b.Event)
+                        .FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
 
-                    using var scopeFallback = _serviceProvider.CreateScope();
-                    var eventService = scopeFallback.ServiceProvider.GetRequiredService<IEventService>();
-                    var bookingRepository = scopeFallback.ServiceProvider.GetRequiredService<IBookingRepository>();
-
-                    var eventExists = await eventService.GetByIdAsync(booking.EventId);
-                    if (eventExists != null)
+                    if (booking != null && booking.Status == BookingStatus.Pending)
                     {
-                        eventExists.ReleaseSeats();
-                        await eventService.UpdateAsync(booking.EventId, eventExists);
+                        if (booking.Event != null)
+                        {
+                            booking.Event.ReleaseSeats();
+                        }
+                        booking.Reject();
+                        await dbContext.SaveChangesAsync(stoppingToken);
+                        logger.LogWarning($"Бронь #{bookingId} отклонена из-за ошибки");
                     }
-
-                    booking.Reject();
-                    bookingRepository.Update(booking);
-
-                    _logger.LogError(ex, $"Бронь #{booking.Id} отклонена из-за ошибки");
                 }
                 catch (Exception innerEx)
                 {
-                    _logger.LogError(innerEx, $"Критическая ошибка при обработке брони #{booking.Id}");
-                }
-                finally
-                {
-                    if (_processingSemaphore.CurrentCount == 0)
-                        _processingSemaphore.Release();
+                    logger.LogError(innerEx, $"Критическая ошибка при отклонении брони #{bookingId}");
                 }
             }
         }
