@@ -16,15 +16,11 @@ namespace events_api.Controllers
             _bookingService = bookingService;
         }
 
-        /// <summary>
-        /// GET /api/bookings/{id} — получить бронь по ID
-        /// </summary>
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(BookingResponse), 200)]
         [ProducesResponseType(404)]
         public async Task<IActionResult> GetById(Guid id)
         {
-            // ✅ Используем правильное имя метода
             var booking = await _bookingService.GetBookingByIdAsync(id);
 
             if (booking == null)
