@@ -5,7 +5,8 @@ API для управления событиями и бронированиям
 Требования
 
 - .NET 10.0 (Preview) или выше
-- PostgreSQL (для запуска приложения)
+- PostgreSQL
+- Docker (для запуска интеграционных тестов)
 - Любая ОС (Windows, Linux, macOS)
 
 Настройка базы данных
@@ -13,12 +14,26 @@ API для управления событиями и бронированиям
 1. Установите PostgreSQL на вашем компьютере.
 2. Создайте базу данных с именем eventapi.
 3. В файле appsettings.json укажите строку подключения:
+
 {
   "ConnectionStrings": {
     "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username=postgres;Password=ваш_пароль"
   }
 }
-4. При первом запуске приложения схема базы данных создаётся автоматически через EnsureCreated. Таблицы Events и Bookings появятся в PostgreSQL без необходимости выполнять миграции вручную.
+
+Миграции
+
+Схема базы данных управляется через Entity Framework Core миграции.
+
+Для создания новой миграции выполните:
+
+dotnet ef migrations add ИмяМиграции
+
+Для применения миграций к базе данных выполните:
+
+dotnet ef database update
+
+При запуске приложения миграции применяются автоматически через метод Migrate().
 
 Запуск проекта
 
@@ -33,8 +48,13 @@ https://localhost:5286/swagger
 
 Запуск тестов
 
-Для тестов используется InMemory-провайдер Entity Framework Core, поэтому база данных не требуется.
+Юнит-тесты используют InMemory-провайдер EF Core и не требуют базы данных.
 
+dotnet test
+
+Интеграционные тесты используют Testcontainers и требуют запущенный Docker. Перед запуском интеграционных тестов убедитесь, что Docker запущен.
+
+cd events_api.IntegrationTests
 dotnet test
 
 Эндпоинты
@@ -199,6 +219,7 @@ TotalSeats - Обязательное, должно быть больше 0
 - ASP.NET Core 10.0 (Preview)
 - Entity Framework Core
 - PostgreSQL
+- Testcontainers
 - Swagger / OpenAPI
 - xUnit (тесты)
 - C# 13.0
