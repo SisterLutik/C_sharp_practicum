@@ -2,7 +2,7 @@
 using events_api.Models;
 using events_api.IntegrationTests.Fixtures;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;  // ← Добавьте
+using Microsoft.EntityFrameworkCore;  
 using Xunit;
 
 namespace events_api.IntegrationTests.Tests;
@@ -23,7 +23,7 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
         var eventRepo = new EventRepository(_fixture.DbContext);
         var bookingRepo = new BookingRepository(_fixture.DbContext);
 
-        var eventItem = new Event("Тестовое событие", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), 10);
+        var eventItem = new Event("Тестовое событие", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10);
         await eventRepo.AddAsync(eventItem);
 
         return (eventItem, bookingRepo, eventRepo);
@@ -41,7 +41,7 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
 
         // Assert
         var saved = await _fixture.DbContext.Bookings
-            .FirstOrDefaultAsync(b => b.Id == booking.Id);  // ✅ работает
+            .FirstOrDefaultAsync(b => b.Id == booking.Id);  
 
         saved.Should().NotBeNull();
         saved!.EventId.Should().Be(eventItem.Id);
