@@ -11,8 +11,8 @@ namespace events_api.Models
             Id = Guid.NewGuid();
             Title = title ?? throw new ArgumentNullException(nameof(title));
             Description = description;
-            StartAt = startAt;
-            EndAt = endAt;
+            StartAt = startAt.Kind == DateTimeKind.Utc ? startAt : DateTime.SpecifyKind(startAt, DateTimeKind.Utc);
+            EndAt = endAt.Kind == DateTimeKind.Utc ? endAt : DateTime.SpecifyKind(endAt, DateTimeKind.Utc);
             TotalSeats = totalSeats;
             AvailableSeats = totalSeats;
             Bookings = new List<Booking>();
@@ -38,14 +38,22 @@ namespace events_api.Models
 
         public ICollection<Booking> Bookings { get; internal set; } = new List<Booking>();
 
-        // ✅ Метод для обновления
         public void UpdateDetails(string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
         {
             Title = title ?? throw new ArgumentNullException(nameof(title));
             Description = description;
-            StartAt = startAt;
-            EndAt = endAt;
+            StartAt = startAt.Kind == DateTimeKind.Utc ? startAt : DateTime.SpecifyKind(startAt, DateTimeKind.Utc);
+            EndAt = endAt.Kind == DateTimeKind.Utc ? endAt : DateTime.SpecifyKind(endAt, DateTimeKind.Utc);
+
+            // Пересчитываем AvailableSeats при изменении TotalSeats
+            var oldTotalSeats = TotalSeats;
             TotalSeats = totalSeats;
+
+            if (TotalSeats != oldTotalSeats)
+            {
+                var seatsAdded = Math.Max(0, TotalSeats - oldTotalSeats);
+                AvailableSeats = Math.Min(AvailableSeats + seatsAdded, TotalSeats);
+            }
         }
 
         public bool TryReserveSeats(int count = 1)

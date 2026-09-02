@@ -1,3 +1,4 @@
+using events_api.Data.Repositories;  // ← Добавить
 using events_api.DataAccess;
 using events_api.Interfaces;
 using events_api.Middleware;
@@ -7,21 +8,25 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Добавляем контроллеры
+// Добавляем контроллеры
 builder.Services.AddControllers();
 
-// 2. Регистрация DbContext
+//  Регистрация DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 3. Регистрация сервисов (Scoped)
+// Регистрация репозиториев (Scoped)
+builder.Services.AddScoped<IEventRepository, EventRepository>();
+builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+
+// Регистрация сервисов (Scoped)
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
-// 4. Фоновый сервис
+// Фоновый сервис
 builder.Services.AddHostedService<BookingBackgroundService>();
 
-// 5. Swagger
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -35,17 +40,17 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// ✅ 6. Создание схемы базы данных
+// Применение миграций
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
 
-// 7. Middleware
+
+
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
-// 8. Swagger UI
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -53,7 +58,6 @@ if (app.Environment.IsDevelopment())
     app.MapGet("/", () => Results.Redirect("/swagger"));
 }
 
-// 9. Маршрутизация
 app.UseHttpsRedirection();
 app.MapControllers();
 

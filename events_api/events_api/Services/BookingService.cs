@@ -1,20 +1,24 @@
 ﻿using events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
-using events_api.DataAccess;
-using Microsoft.EntityFrameworkCore;
+using events_api.Data.Repositories;
 
 namespace events_api.Services
 {
     public class BookingService : IBookingService
     {
-        private readonly AppDbContext _context;
+        private readonly IEventRepository _eventRepository;
+        private readonly IBookingRepository _bookingRepository;
         private readonly ILogger<BookingService> _logger;
         private static readonly SemaphoreSlim _bookingSemaphore = new(1, 1);
 
-        public BookingService(AppDbContext context, ILogger<BookingService> logger)
+        public BookingService(
+            IEventRepository eventRepository,
+            IBookingRepository bookingRepository,
+            ILogger<BookingService> logger)
         {
-            _context = context;
+            _eventRepository = eventRepository;
+            _bookingRepository = bookingRepository;
             _logger = logger;
         }
 
@@ -24,20 +28,17 @@ namespace events_api.Services
 
             try
             {
-                var eventExists = await _context.Events
-                    .FirstOrDefaultAsync(e => e.Id == eventId);
-
+                var eventExists = await _eventRepository.GetByIdAsync(eventId);
                 if (eventExists == null)
                     throw new BusinessException($"Событие с id {eventId} не найдено", 404);
 
                 if (!eventExists.TryReserveSeats())
                     throw new NoAvailableSeatsException("No available seats for this event");
 
-                var booking = new Booking(eventId);
-                await _context.Bookings.AddAsync(booking);
+                await _eventRepository.UpdateAsync(eventExists);
 
-                // ✅ Один вызов сохраняет и бронь, и изменение AvailableSeats
-                await _context.SaveChangesAsync();
+                var booking = new Booking(eventId);
+                await _bookingRepository.AddAsync(booking);
 
                 _logger.LogInformation($"Создана бронь {booking.Id} для события {eventId}");
                 return booking;
@@ -50,14 +51,7 @@ namespace events_api.Services
 
         public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
         {
-            var booking = await _context.Bookings
-                .Include(b => b.Event)
-                .FirstOrDefaultAsync(b => b.Id == bookingId);
-
-            if (booking == null)
-                throw new BusinessException($"Бронь с id {bookingId} не найдена", 404);
-
-            return booking;
+            return await _bookingRepository.GetByIdAsync(bookingId);
         }
     }
 }

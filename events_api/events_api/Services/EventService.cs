@@ -1,27 +1,24 @@
 ﻿using events_api.Exceptions;
 using events_api.Interfaces;
 using events_api.Models;
-using events_api.DataAccess;
-using Microsoft.EntityFrameworkCore;
+using events_api.Data.Repositories;
 
 namespace events_api.Services
 {
     public class EventService : IEventService
     {
-        private readonly AppDbContext _context;
+        private readonly IEventRepository _eventRepository;
         private readonly ILogger<EventService> _logger;
 
-        public EventService(AppDbContext context, ILogger<EventService> logger)
+        public EventService(IEventRepository eventRepository, ILogger<EventService> logger)
         {
-            _context = context;
+            _eventRepository = eventRepository;
             _logger = logger;
         }
 
         public async Task<Event?> GetByIdAsync(Guid id)
         {
-            return await _context.Events
-                .Include(e => e.Bookings)
-                .FirstOrDefaultAsync(e => e.Id == id);
+            return await _eventRepository.GetByIdAsync(id);
         }
 
         public async Task<PaginatedResult<Event>> GetAllAsync(
@@ -31,31 +28,7 @@ namespace events_api.Services
             int page,
             int pageSize)
         {
-            var query = _context.Events.AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(title))
-                query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
-
-            if (from.HasValue)
-                query = query.Where(e => e.StartAt >= from.Value);
-
-            if (to.HasValue)
-                query = query.Where(e => e.EndAt <= to.Value);
-
-            var totalCount = await query.CountAsync();
-
-            var items = await query
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            return new PaginatedResult<Event>
-            {
-                Page = page,
-                PageSize = pageSize,
-                TotalCount = totalCount,
-                Items = items
-            };
+            return await _eventRepository.GetAllAsync(title, from, to, page, pageSize);
         }
 
         public async Task<Event> CreateEventAsync(
@@ -72,16 +45,15 @@ namespace events_api.Services
                 throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
             var newEvent = new Event(title, startAt, endAt, totalSeats, description);
-            await _context.Events.AddAsync(newEvent);
-            await _context.SaveChangesAsync();
-            _logger.LogInformation($"Создано событие {newEvent.Id}");
+            await _eventRepository.AddAsync(newEvent);
 
+            _logger.LogInformation($"Создано событие {newEvent.Id}");
             return newEvent;
         }
 
         public async Task<Event> UpdateAsync(Guid id, Event updatedEvent)
         {
-            var existingEvent = await GetByIdAsync(id);
+            var existingEvent = await _eventRepository.GetByIdAsync(id);
             if (existingEvent == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
@@ -96,7 +68,7 @@ namespace events_api.Services
             if (existingEvent.EndAt <= existingEvent.StartAt)
                 throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
-            await _context.SaveChangesAsync();
+            await _eventRepository.UpdateAsync(existingEvent);
             _logger.LogInformation($"Обновлено событие {id}");
 
             return existingEvent;
@@ -104,12 +76,11 @@ namespace events_api.Services
 
         public async Task DeleteAsync(Guid id)
         {
-            var eventItem = await GetByIdAsync(id);
-            if (eventItem == null)
+            var exists = await _eventRepository.ExistsAsync(id);
+            if (!exists)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
-            _context.Events.Remove(eventItem);
-            await _context.SaveChangesAsync();
+            await _eventRepository.DeleteAsync(id);
             _logger.LogInformation($"Удалено событие {id}");
         }
     }

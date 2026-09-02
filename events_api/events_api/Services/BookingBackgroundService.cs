@@ -1,9 +1,6 @@
-﻿using events_api.Interfaces;
+﻿using events_api.Data.Repositories;
 using events_api.Models;
-using events_api.DataAccess;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+
 
 namespace events_api.Services
 {
@@ -44,100 +41,57 @@ namespace events_api.Services
 
         private async Task ProcessPendingBookings(CancellationToken stoppingToken)
         {
-            // ✅ Создаём scope для чтения Pending броней
-            using var readScope = _scopeFactory.CreateScope();
-            var dbContext = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            using var scope = _scopeFactory.CreateScope();
+            var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
 
-            var pendingBookingIds = await dbContext.Bookings
-                .Where(b => b.Status == BookingStatus.Pending)
-                .Select(b => b.Id)
-                .ToListAsync(stoppingToken);
+            var pendingBookings = await bookingRepository.GetPendingAsync();
 
-            if (!pendingBookingIds.Any())
+            if (!pendingBookings.Any())
                 return;
 
-            _logger.LogInformation($"Найдено {pendingBookingIds.Count} броней в статусе Pending");
+            _logger.LogInformation($"Найдено {pendingBookings.Count} броней в статусе Pending");
 
-            // ✅ Каждая задача получает свой scope
-            var tasks = pendingBookingIds.Select(bookingId =>
-                ProcessBookingWithOwnScopeAsync(bookingId, stoppingToken));
+            var tasks = pendingBookings.Select(booking =>
+                ProcessBookingWithOwnScopeAsync(booking, stoppingToken));
 
             await Task.WhenAll(tasks);
         }
 
-        private async Task ProcessBookingWithOwnScopeAsync(Guid bookingId, CancellationToken stoppingToken)
+        private async Task ProcessBookingWithOwnScopeAsync(Booking booking, CancellationToken stoppingToken)
         {
-            // ✅ Создаём отдельный scope для каждой брони
             using var scope = _scopeFactory.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<BookingBackgroundService>>();
+            var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+            var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
 
             try
             {
-                logger.LogInformation($"Обработка брони #{bookingId}...");
+                _logger.LogInformation($"Обработка брони #{booking.Id}...");
                 await Task.Delay(2000, stoppingToken);
 
-                // Получаем бронь вместе со связанным событием
-                var booking = await dbContext.Bookings
-                    .Include(b => b.Event)
-                    .FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
+                var bookingEntity = await bookingRepository.GetByIdAsync(booking.Id);
+                if (bookingEntity == null || bookingEntity.Status != BookingStatus.Pending)
+                    return;
 
-                if (booking == null)
+                var eventExists = await eventRepository.GetByIdAsync(bookingEntity.EventId);
+                if (eventExists == null)
                 {
-                    logger.LogWarning($"Бронь #{bookingId} не найдена");
+                    bookingEntity.Reject();
+                    await bookingRepository.UpdateAsync(bookingEntity);
+                    _logger.LogWarning($"Бронь #{booking.Id} отклонена: событие не найдено");
                     return;
                 }
 
-                if (booking.Status != BookingStatus.Pending)
-                {
-                    logger.LogInformation($"Бронь #{bookingId} уже обработана (статус: {booking.Status})");
-                    return;
-                }
-
-                // Проверяем, существует ли событие
-                if (booking.Event == null)
-                {
-                    booking.Reject();
-                    await dbContext.SaveChangesAsync(stoppingToken);
-                    logger.LogWarning($"Бронь #{bookingId} отклонена: событие не найдено");
-                    return;
-                }
-
-                // Подтверждаем бронь
-                booking.Confirm();
-                await dbContext.SaveChangesAsync(stoppingToken);
-                logger.LogInformation($"Бронь #{bookingId} подтверждена");
+                bookingEntity.Confirm();
+                await bookingRepository.UpdateAsync(bookingEntity);
+                _logger.LogInformation($"Бронь #{booking.Id} подтверждена");
             }
             catch (OperationCanceledException)
             {
-                logger.LogWarning($"Обработка брони #{bookingId} отменена");
+                _logger.LogWarning($"Обработка брони #{booking.Id} отменена");
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, $"Ошибка при обработке брони #{bookingId}");
-
-                // Пытаемся отклонить бронь в случае ошибки
-                try
-                {
-                    var booking = await dbContext.Bookings
-                        .Include(b => b.Event)
-                        .FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
-
-                    if (booking != null && booking.Status == BookingStatus.Pending)
-                    {
-                        if (booking.Event != null)
-                        {
-                            booking.Event.ReleaseSeats();
-                        }
-                        booking.Reject();
-                        await dbContext.SaveChangesAsync(stoppingToken);
-                        logger.LogWarning($"Бронь #{bookingId} отклонена из-за ошибки");
-                    }
-                }
-                catch (Exception innerEx)
-                {
-                    logger.LogError(innerEx, $"Критическая ошибка при отклонении брони #{bookingId}");
-                }
+                _logger.LogError(ex, $"Ошибка при обработке брони #{booking.Id}");
             }
         }
     }
