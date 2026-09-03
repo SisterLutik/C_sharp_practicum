@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace events_api.Exceptions  
+namespace events_api.Exceptions
 {
     public class BusinessException : Exception
     {

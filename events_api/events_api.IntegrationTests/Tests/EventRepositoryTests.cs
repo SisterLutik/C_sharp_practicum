@@ -48,7 +48,7 @@ public class EventRepositoryTests : IClassFixture<TestDatabaseFixture>
         // Arrange
         await _fixture.ResetDatabaseAsync();
         var repository = new EventRepository(_fixture.DbContext);
-        
+
         var baseDate = DateTime.UtcNow.Date;
 
         await repository.AddAsync(new Event(

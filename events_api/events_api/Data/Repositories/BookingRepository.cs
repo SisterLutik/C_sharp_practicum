@@ -7,7 +7,7 @@ namespace events_api.Data.Repositories
 {
     public class BookingRepository : IBookingRepository
     {
-        private readonly AppDbContext _context;  
+        private readonly AppDbContext _context;
 
         public BookingRepository(AppDbContext context)
         {

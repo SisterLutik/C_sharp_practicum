@@ -2,7 +2,7 @@
 using events_api.Models;
 using events_api.IntegrationTests.Fixtures;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;  
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace events_api.IntegrationTests.Tests;
@@ -41,7 +41,7 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
 
         // Assert
         var saved = await _fixture.DbContext.Bookings
-            .FirstOrDefaultAsync(b => b.Id == booking.Id);  
+            .FirstOrDefaultAsync(b => b.Id == booking.Id);
 
         saved.Should().NotBeNull();
         saved!.EventId.Should().Be(eventItem.Id);
