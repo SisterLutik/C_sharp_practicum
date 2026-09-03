@@ -50,7 +50,9 @@ namespace events_api.Data.Repositories
 
         public async Task DeleteAsync(Guid id)
         {
-            var booking = await GetByIdAsync(id);
+            var booking = await _context.Bookings
+        .FirstOrDefaultAsync(b => b.Id == id);
+
             if (booking != null)
             {
                 _context.Bookings.Remove(booking);
