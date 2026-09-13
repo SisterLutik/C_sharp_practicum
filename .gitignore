@@ -8,6 +8,7 @@
 *.csproj.user
 *.vssscc
 *.vspscc
+*.cache
 /events_api/.vs
 /events_api/events_api/.vs
 events_api.Tests/bin
