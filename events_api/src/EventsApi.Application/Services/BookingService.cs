@@ -51,7 +51,12 @@ namespace EventsApi.Application.Services
 
         public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
         {
-            return await _bookingRepository.GetByIdAsync(bookingId);
+            var booking = await _bookingRepository.GetByIdAsync(bookingId);
+
+            if (booking == null)
+                throw new BusinessException($"Бронь с id {bookingId} не найдена", 404);
+
+            return booking;
         }
     }
 }

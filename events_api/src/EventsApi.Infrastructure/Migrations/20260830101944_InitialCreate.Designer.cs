@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using events_api.DataAccess;
+using EventsApi.Infrastructure.DataAccess;
 
 #nullable disable
 
-namespace events_api.Migrations
+namespace EventsApi.Infrastructure.DataAccess.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     [Migration("20260830101944_InitialCreate")]
