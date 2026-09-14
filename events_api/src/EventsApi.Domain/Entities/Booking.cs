@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using EventsApi.Domain.Enums;
 
-namespace events_api.Models
+namespace EventsApi.Domain.Entities
 {
     public class Booking : IValidatableObject
     {

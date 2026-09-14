@@ -1,4 +1,4 @@
-﻿namespace events_api.Models
+﻿namespace EventsApi.Domain.Enums
 {
     public enum BookingStatus
     {

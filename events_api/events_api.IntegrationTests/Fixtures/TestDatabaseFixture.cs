@@ -1,4 +1,4 @@
-﻿using events_api.DataAccess;
+﻿using EventsApi.Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 using Xunit;

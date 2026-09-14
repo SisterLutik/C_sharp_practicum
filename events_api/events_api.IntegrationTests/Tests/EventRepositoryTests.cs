@@ -1,6 +1,6 @@
-﻿using events_api.Data.Repositories;
-using events_api.Models;
+﻿using EventsApi.Infrastructure.DataAccess.Repositories;
 using events_api.IntegrationTests.Fixtures;
+using EventsApi.Domain.Entities;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

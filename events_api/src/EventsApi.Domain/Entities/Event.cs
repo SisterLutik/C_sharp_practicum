@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace events_api.Models
+namespace EventsApi.Domain.Entities
 {
     public class Event : IValidatableObject
     {
