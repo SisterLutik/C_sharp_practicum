@@ -28,7 +28,7 @@ namespace EventsApi.Domain.Entities
 
         public DateTime? ProcessedAt { get; internal set; }
 
-        // ✅ Навигационное свойство: бронь → событие
+        //  Навигационное свойство: бронь → событие
         public Event Event { get; internal set; } = null!;
 
         public void Confirm()
