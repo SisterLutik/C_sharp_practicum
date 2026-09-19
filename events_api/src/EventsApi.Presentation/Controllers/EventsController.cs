@@ -29,16 +29,6 @@ namespace events_api.Controllers
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10)
         {
-            if (page < 1)
-                throw new BusinessException("Page должен быть больше или равен 1", 400);
-
-            if (pageSize < 1)
-                throw new BusinessException("PageSize должен быть больше или равен 1", 400);
-
-            if (from.HasValue && to.HasValue && from > to)
-                throw new BusinessException("Дата начала (from) не может быть позже даты окончания (to)", 400);
-
-            // ✅ Используем GetAllAsync
             var result = await _eventService.GetAllAsync(title, from, to, page, pageSize);
             return Ok(result);
         }
@@ -48,7 +38,7 @@ namespace events_api.Controllers
         [ProducesResponseType(404)]
         public async Task<IActionResult> GetById(Guid id)
         {
-            // ✅ Используем GetByIdAsync
+            // Используем GetByIdAsync
             var eventItem = await _eventService.GetByIdAsync(id);
 
             if (eventItem == null)
@@ -68,7 +58,7 @@ namespace events_api.Controllers
             if (request.EndAt <= request.StartAt)
                 throw new BusinessException("EndAt должен быть позже StartAt", 400);
 
-            // ✅ Используем CreateEventAsync (уже правильно)
+            // Используем CreateEventAsync 
             var newEvent = await _eventService.CreateEventAsync(
                 request.Title,
                 request.Description,
@@ -92,7 +82,7 @@ namespace events_api.Controllers
             if (!ModelState.IsValid)
                 throw new BusinessException("Ошибка валидации модели", 400);
 
-            // ✅ Используем UpdateAsync
+            // Используем UpdateAsync
             var result = await _eventService.UpdateAsync(id, updatedEvent);
             return Ok(result);
         }
@@ -102,7 +92,7 @@ namespace events_api.Controllers
         [ProducesResponseType(404)]
         public async Task<IActionResult> Delete(Guid id)
         {
-            // ✅ Используем DeleteAsync
+            // Используем DeleteAsync
             await _eventService.DeleteAsync(id);
             return NoContent();
         }
@@ -114,12 +104,12 @@ namespace events_api.Controllers
         [ProducesResponseType(409)]
         public async Task<IActionResult> CreateBooking(Guid id)
         {
-            // ✅ Используем GetByIdAsync
+            // Используем GetByIdAsync
             var eventExists = await _eventService.GetByIdAsync(id);
             if (eventExists == null)
                 throw new BusinessException($"Событие с id {id} не найдено", 404);
 
-            // ✅ Используем CreateBookingAsync
+            // Используем CreateBookingAsync
             var booking = await _bookingService.CreateBookingAsync(id);
 
             var response = new BookingResponse

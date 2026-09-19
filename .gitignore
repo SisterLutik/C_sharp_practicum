@@ -1,5 +1,14 @@
 /events_api/events_api/obj
 /events_api/events_api/bin
+/events_api/src/EventsApi.Presentation/obj
+/events_api/src/EventsApi.Presentation/bin
+/events_api/src/EventsApi.Application/obj
+/events_api/src/EventsApi.Application/bin
+/events_api/src/EventsApi.Domain/obj
+/events_api/src/EventsApi.Domain/bin
+/events_api/src/EventsApi.Infrastructure/obj
+/events_api/src/EventsApi.Infrastructure/bin
+
 *.dll
 *.exe
 *.suo

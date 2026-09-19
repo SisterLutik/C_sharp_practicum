@@ -1,8 +1,9 @@
-﻿using events_api.DataAccess;
-using events_api.Exceptions;
-using events_api.Interfaces;
-using events_api.Models;
-using events_api.Services;
+﻿using EventsApi.Application.Interfaces;
+using EventsApi.Application.Services;
+using EventsApi.Domain.Entities;
+using EventsApi.Domain.Exceptions;
+using EventsApi.Infrastructure.DataAccess;
+using EventsApi.Infrastructure.DataAccess.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,10 +25,17 @@ namespace events_api.Tests.Services
             _dbName = Guid.NewGuid().ToString();
             var services = new ServiceCollection();
 
+            // DbContext (InMemory)
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase(_dbName));
 
+            // Логгер
             services.AddSingleton<ILogger<EventService>>(NullLogger<EventService>.Instance);
+
+            // Репозиторий — ОБЯЗАТЕЛЬНО
+            services.AddScoped<IEventRepository, EventRepository>();
+
+            // Сервис
             services.AddScoped<IEventService, EventService>();
 
             _serviceProvider = services.BuildServiceProvider();

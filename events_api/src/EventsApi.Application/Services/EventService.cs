@@ -23,15 +23,19 @@ namespace EventsApi.Application.Services
         }
 
         public async Task<PaginatedResult<Event>> GetAllAsync(
-            string? title,
-            DateTime? from,
-            DateTime? to,
-            int page,
-            int pageSize)
+    string? title, DateTime? from, DateTime? to, int page, int pageSize)
         {
+            if (page < 1)
+                throw new BusinessException("Page должен быть больше или равен 1", 400);
+
+            if (pageSize < 1)
+                throw new BusinessException("PageSize должен быть больше или равен 1", 400);
+
+            if (from.HasValue && to.HasValue && from > to)
+                throw new BusinessException("Дата from не может быть позже to", 400);
+
             return await _eventRepository.GetAllAsync(title, from, to, page, pageSize);
         }
-
         public async Task<Event> CreateEventAsync(
             string title,
             string? description,

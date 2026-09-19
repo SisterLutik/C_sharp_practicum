@@ -9,11 +9,51 @@ API для управления событиями и бронированиям
 - Docker (для запуска интеграционных тестов)
 - Любая ОС (Windows, Linux, macOS)
 
+Структура проекта
+
+Проект разделён на четыре слоя в соответствии с принципами чистой архитектуры. Каждый слой — отдельная сборка (class library), что гарантирует соблюдение направления зависимостей на уровне компилятора.
+
+events_api/
+├── src/
+│   ├── EventsApi.Domain/           Доменный слой
+│   ├── EventsApi.Application/      Слой приложения
+│   ├── EventsApi.Infrastructure/   Инфраструктурный слой
+│   └── EventsApi.Presentation/     Слой представления (точка входа, Web API)
+└── tests/
+    ├── EventsApi.Tests/            Юнит-тесты
+    └── EventsApi.IntegrationTests/ Интеграционные тесты
+
+Назначение слоёв
+
+EventsApi.Domain — доменные сущности (Event, Booking), перечисления (BookingStatus), доменные исключения (BusinessException, NoAvailableSeatsException). Не зависит ни от каких внешних библиотек и фреймворков.
+
+EventsApi.Application — бизнес-логика (use cases), интерфейсы сервисов (IEventService, IBookingService), интерфейсы портов для доступа к данным (IEventRepository, IBookingRepository), DTO (EventResponse, BookingResponse, CreateEventRequest, PaginatedResult). Зависит только от Domain.
+
+EventsApi.Infrastructure — реализации портов: репозитории (EventRepository, BookingRepository), AppDbContext, конфигурации маппинга, миграции. Зависит от Application и Domain.
+
+EventsApi.Presentation — контроллеры, middleware для обработки исключений, фоновая служба, Program.cs (composition root), настройка Swagger. Зависит от Application и Infrastructure.
+
+Схема зависимостей
+
+Presentation → Application + Infrastructure
+Infrastructure → Application + Domain
+Application → Domain
+Domain → (ни от чего не зависит)
+
+Компилятор не позволит нарушить это направление: если Domain попытается сослаться на Infrastructure, сборка упадёт.
+
+Пути к проектам
+
+src/EventsApi.Domain/EventsApi.Domain.csproj
+src/EventsApi.Application/EventsApi.Application.csproj
+src/EventsApi.Infrastructure/EventsApi.Infrastructure.csproj
+src/EventsApi.Presentation/EventsApi.Presentation.csproj
+
 Настройка базы данных
 
-1. Установите PostgreSQL на вашем компьютере.
-2. Создайте базу данных с именем eventapi.
-3. В файле appsettings.json укажите строку подключения:
+1. Установите PostgreSQL.
+2. Создайте базу данных eventapi.
+3. В файле src/EventsApi.Presentation/appsettings.json укажите строку подключения:
 
 {
   "ConnectionStrings": {
@@ -23,88 +63,81 @@ API для управления событиями и бронированиям
 
 Миграции
 
-Схема базы данных управляется через Entity Framework Core миграции.
+Схема базы данных управляется через миграции Entity Framework Core. Все миграции находятся в проекте EventsApi.Infrastructure. При запуске приложения миграции применяются автоматически через db.Database.Migrate() в Program.cs.
 
-Для создания новой миграции выполните:
-
-dotnet ef migrations add ИмяМиграции
-
-Для применения миграций к базе данных выполните:
-
-dotnet ef database update
-
-При запуске приложения миграции применяются автоматически через метод Migrate().
-
-Запуск проекта
+Запуск приложения
 
 1. Восстановите зависимости:
-dotnet restore
+dotnet restore events_api/events_api/events_api.sln
 
-2. Запустите приложение:
-dotnet run
+2. Запустите приложение (точка входа — EventsApi.Presentation):
+dotnet run --project events_api/src/EventsApi.Presentation
 
 3. Откройте Swagger UI:
 https://localhost:5286/swagger
 
 Запуск тестов
 
-Юнит-тесты используют InMemory-провайдер EF Core и не требуют базы данных.
+Юнит-тесты
 
-dotnet test
+Используют InMemory-провайдер EF Core, не требуют базы данных и Docker.
 
-Интеграционные тесты используют Testcontainers и требуют запущенный Docker. Перед запуском интеграционных тестов убедитесь, что Docker запущен.
+dotnet test tests/EventsApi.Tests/EventsApi.Tests.csproj
 
-cd events_api.IntegrationTests
-dotnet test
+Интеграционные тесты
+
+Используют Testcontainers и требуют запущенный Docker. Перед запуском убедитесь, что Docker Desktop запущен.
+
+dotnet test tests/EventsApi.IntegrationTests/EventsApi.IntegrationTests.csproj
 
 Эндпоинты
 
 События
 
-GET /api/events - Получить все события с фильтрацией и пагинацией
-GET /api/events/{id} - Получить событие по ID
-POST /api/events - Создать событие
-PUT /api/events/{id} - Полностью обновить событие
-DELETE /api/events/{id} - Удалить событие
+GET /api/events — получить все события с фильтрацией и пагинацией
+GET /api/events/{id} — получить событие по ID
+POST /api/events — создать событие
+PUT /api/events/{id} — полностью обновить событие
+DELETE /api/events/{id} — удалить событие
 
 Бронирования
 
-POST /api/events/{id}/book - Создать бронь для события
-GET /api/bookings/{id} - Получить бронь по ID
+POST /api/events/{id}/book — создать бронь для события
+GET /api/bookings/{id} — получить бронь по ID
 
 Модели данных
 
 Event
 
-id (Guid) - Уникальный идентификатор события
-title (string) - Название события
-description (string?) - Описание события
-startAt (DateTime) - Дата и время начала
-endAt (DateTime) - Дата и время окончания
-totalSeats (int) - Общее количество мест на событии
-availableSeats (int) - Текущее количество свободных мест
+id (Guid) — уникальный идентификатор события
+title (string) — название события
+description (string?) — описание события
+startAt (DateTime) — дата и время начала
+endAt (DateTime) — дата и время окончания
+totalSeats (int) — общее количество мест
+availableSeats (int) — текущее количество свободных мест
 
 Booking
 
-id (Guid) - Уникальный идентификатор брони
-eventId (Guid) - Идентификатор события
-status (BookingStatus) - Текущий статус брони
-createdAt (DateTime) - Дата и время создания
-processedAt (DateTime?) - Дата и время обработки
+id (Guid) — уникальный идентификатор брони
+eventId (Guid) — идентификатор события
+status (BookingStatus) — текущий статус брони
+createdAt (DateTime) — дата и время создания
+processedAt (DateTime?) — дата и время обработки
 
 BookingStatus (enum)
 
-Pending - Бронь создана, ожидает обработки
-Confirmed - Бронь подтверждена
-Rejected - Бронь отклонена
+Pending — бронь создана, ожидает обработки
+Confirmed — бронь подтверждена
+Rejected — бронь отклонена
 
 Параметры запроса (GET /api/events)
 
-title (string) - Поиск по названию (регистронезависимый, частичное совпадение)
-from (DateTime) - События, начинающиеся не раньше даты
-to (DateTime) - События, заканчивающиеся не позже даты
-page (int) - Номер страницы (по умолчанию 1)
-pageSize (int) - Количество элементов на странице (по умолчанию 10)
+title (string) — поиск по названию (регистронезависимый, частичное совпадение)
+from (DateTime) — события, начинающиеся не раньше даты
+to (DateTime) — события, заканчивающиеся не позже даты
+page (int) — номер страницы (по умолчанию 1)
+pageSize (int) — количество элементов на странице (по умолчанию 10)
 
 Формат ответа (GET /api/events)
 
@@ -128,13 +161,14 @@ pageSize (int) - Количество элементов на странице (
 
 Фоновая обработка броней
 
-Приложение содержит фоновый сервис BookingBackgroundService, который автоматически обрабатывает бронирования:
+Приложение содержит фоновый сервис BookingBackgroundService, который автоматически обрабатывает бронирования. Сама логика обработки одной брони (Confirm/Reject) вынесена в слой Application (BookingProcessor).
+
 - Интервал опроса: 5 секунд
 - Проверка: ищет брони со статусом Pending
 - Обработка: параллельная (Task.WhenAll), для каждой брони выполняется задержка 2 секунды (имитация внешней системы)
 - Результат: бронь переводится в статус Confirmed
 - Заполнение: поле processedAt получает текущую дату и время
-- При ошибке или удалении события: бронь переводится в статус Rejected, место возвращается в пул
+- При ошибке или удалении события: бронь переводится в статус Rejected
 
 Примеры запросов
 
@@ -150,7 +184,8 @@ POST /api/events
 
 POST /api/events/{id}/book
 
-Запрос: (тело пустое)
+Запрос: тело пустое.
+
 Заголовки ответа:
 Location: /api/bookings/3f2c1d8e-1234-5678-9abc-def012345678
 
@@ -198,21 +233,21 @@ DELETE /api/events/{id}
 
 Коды ответов
 
-200 - Успешно
-201 - Создано
-202 - Принято в обработку
-204 - Удалено
-400 - Ошибка валидации
-404 - Ресурс не найден
-409 - Конфликт (нет свободных мест)
-500 - Внутренняя ошибка сервера
+200 — успешно
+201 — создано
+202 — принято в обработку
+204 — удалено
+400 — ошибка валидации
+404 — ресурс не найден
+409 — конфликт (нет свободных мест)
+500 — внутренняя ошибка сервера
 
 Валидация
 
-Title - Обязательное
-StartAt - Обязательное
-EndAt - Обязательное, должно быть позже StartAt
-TotalSeats - Обязательное, должно быть больше 0
+Title — обязательное
+StartAt — обязательное
+EndAt — обязательное, должно быть позже StartAt
+TotalSeats — обязательное, должно быть больше 0
 
 Технологии
 
