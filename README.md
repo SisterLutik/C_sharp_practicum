@@ -14,14 +14,21 @@ API для управления событиями и бронированиям
 Проект разделён на четыре слоя в соответствии с принципами чистой архитектуры. Каждый слой — отдельная сборка (class library), что гарантирует соблюдение направления зависимостей на уровне компилятора.
 
 events_api/
-├── src/
-│   ├── EventsApi.Domain/           Доменный слой
-│   ├── EventsApi.Application/      Слой приложения
-│   ├── EventsApi.Infrastructure/   Инфраструктурный слой
-│   └── EventsApi.Presentation/     Слой представления (точка входа, Web API)
-└── tests/
-    ├── EventsApi.Tests/            Юнит-тесты
-    └── EventsApi.IntegrationTests/ Интеграционные тесты
+├── events_api/                             Корневая папка решения
+│   ├── events_api.sln                      Файл решения
+│   ├── src/
+│   │   ├── EventsApi.Domain/               Доменный слой
+│   │   │   └── EventsApi.Domain.csproj
+│   │   ├── EventsApi.Application/          Слой приложения
+│   │   │   └── EventsApi.Application.csproj
+│   │   ├── EventsApi.Infrastructure/       Инфраструктурный слой
+│   │   │   └── EventsApi.Infrastructure.csproj
+│   │   └── EventsApi.Presentation/         Слой представления (точка входа, Web API)
+│   │       └── EventsApi.Presentation.csproj
+│   ├── events_api.Tests/                   Юнит-тесты
+│   │   └── events_api.Tests.csproj
+│   └── events_api.IntegrationTests/        Интеграционные тесты
+│       └── events_api.IntegrationTests.csproj
 
 Назначение слоёв
 
@@ -48,6 +55,8 @@ src/EventsApi.Domain/EventsApi.Domain.csproj
 src/EventsApi.Application/EventsApi.Application.csproj
 src/EventsApi.Infrastructure/EventsApi.Infrastructure.csproj
 src/EventsApi.Presentation/EventsApi.Presentation.csproj
+events_api.Tests/events_api.Tests.csproj
+events_api.IntegrationTests/events_api.IntegrationTests.csproj
 
 Настройка базы данных
 
@@ -65,30 +74,39 @@ src/EventsApi.Presentation/EventsApi.Presentation.csproj
 
 Схема базы данных управляется через миграции Entity Framework Core. Все миграции находятся в проекте EventsApi.Infrastructure. При запуске приложения миграции применяются автоматически через db.Database.Migrate() в Program.cs.
 
+Создание новой миграции
+
+dotnet ef migrations add <Name> --project events_api/src/EventsApi.Infrastructure --startup-project events_api/src/EventsApi.Presentation
+
 Запуск приложения
 
 1. Восстановите зависимости:
-dotnet restore events_api/events_api/events_api.sln
+dotnet restore events_api/events_api.sln
 
 2. Запустите приложение (точка входа — EventsApi.Presentation):
 dotnet run --project events_api/src/EventsApi.Presentation
 
 3. Откройте Swagger UI:
-https://localhost:5286/swagger
+http://localhost:5286/swagger (профиль http)
+https://localhost:7058/swagger (профиль https)
 
 Запуск тестов
+
+Все тесты (юнит и интеграционные) через решение:
+
+dotnet test events_api/events_api.sln
 
 Юнит-тесты
 
 Используют InMemory-провайдер EF Core, не требуют базы данных и Docker.
 
-dotnet test tests/EventsApi.Tests/EventsApi.Tests.csproj
+dotnet test events_api/events_api.Tests/events_api.Tests.csproj
 
 Интеграционные тесты
 
 Используют Testcontainers и требуют запущенный Docker. Перед запуском убедитесь, что Docker Desktop запущен.
 
-dotnet test tests/EventsApi.IntegrationTests/EventsApi.IntegrationTests.csproj
+dotnet test events_api/events_api.IntegrationTests/events_api.IntegrationTests.csproj
 
 Эндпоинты
 
