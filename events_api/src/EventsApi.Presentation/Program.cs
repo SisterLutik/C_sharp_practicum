@@ -1,6 +1,5 @@
 using EventsApi.Application;
 using EventsApi.Infrastructure;
-using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Presentation.BackgroundServices;
 using EventsApi.Presentation.Middleware;
 using Microsoft.EntityFrameworkCore;

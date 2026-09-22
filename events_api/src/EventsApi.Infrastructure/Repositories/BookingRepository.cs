@@ -4,7 +4,7 @@ using EventsApi.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 
-namespace EventsApi.Infrastructure.DataAccess.Repositories
+namespace EventsApi.Infrastructure
 {
     public class BookingRepository : IBookingRepository
     {

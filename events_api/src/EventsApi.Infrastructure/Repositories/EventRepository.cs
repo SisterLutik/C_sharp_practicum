@@ -3,7 +3,7 @@ using EventsApi.Application.Interfaces;
 using EventsApi.Application.DTOs;
 using Microsoft.EntityFrameworkCore;
 
-namespace EventsApi.Infrastructure.DataAccess.Repositories
+namespace EventsApi.Infrastructure
 {
     public class EventRepository : IEventRepository
     {

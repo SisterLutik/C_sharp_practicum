@@ -1,4 +1,4 @@
-﻿using EventsApi.Infrastructure.DataAccess;
+﻿using EventsApi.Infrastructure;
 using EventsApi.Application.Interfaces;
 using EventsApi.Application.Services;
 using Microsoft.EntityFrameworkCore;

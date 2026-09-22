@@ -1,9 +1,7 @@
 ﻿using EventsApi.Application.Interfaces;
 using EventsApi.Application.Services;
 using EventsApi.Domain.Entities;
-using EventsApi.Domain.Exceptions;
-using EventsApi.Infrastructure.DataAccess;
-using EventsApi.Infrastructure.DataAccess.Repositories;
+using EventsApi.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

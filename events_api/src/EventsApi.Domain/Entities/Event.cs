@@ -20,18 +20,14 @@ namespace EventsApi.Domain.Entities
 
         public Guid Id { get; internal set; }
 
-        [Required(ErrorMessage = "Title обязателен")]
         public string Title { get; internal set; } = null!;
 
         public string? Description { get; internal set; }
 
-        [Required(ErrorMessage = "StartAt обязателен")]
         public DateTime StartAt { get; internal set; }
 
-        [Required(ErrorMessage = "EndAt обязателен")]
         public DateTime EndAt { get; internal set; }
 
-        [Required(ErrorMessage = "TotalSeats обязателен")]
         public int TotalSeats { get; internal set; }
 
         public int AvailableSeats { get; internal set; }

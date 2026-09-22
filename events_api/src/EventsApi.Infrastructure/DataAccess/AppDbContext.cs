@@ -1,7 +1,7 @@
 ﻿using EventsApi.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace EventsApi.Infrastructure.DataAccess
+namespace EventsApi.Infrastructure
 {
     public sealed class AppDbContext : DbContext
     {

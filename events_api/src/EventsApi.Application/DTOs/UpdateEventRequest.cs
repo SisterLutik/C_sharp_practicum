@@ -2,7 +2,7 @@
 
 namespace EventsApi.Application.DTOs;
 
-public class CreateEventRequest
+public class UpdateEventRequest
 {
     [Required(ErrorMessage = "Title обязателен")]
     [MaxLength(200)]

@@ -17,13 +17,10 @@ namespace EventsApi.Domain.Entities
 
         public Guid Id { get; internal set; }
 
-        [Required(ErrorMessage = "EventId обязателен")]
         public Guid EventId { get; internal set; }
 
-        [Required(ErrorMessage = "Status обязателен")]
         public BookingStatus Status { get; internal set; }
 
-        [Required(ErrorMessage = "CreatedAt обязателен")]
         public DateTime CreatedAt { get; internal set; }
 
         public DateTime? ProcessedAt { get; internal set; }
