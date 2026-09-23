@@ -1,12 +1,12 @@
-﻿using EventsApi.Domain.Entities;
+﻿using events_api.IntegrationTests.Fixtures;
+using EventsApi.Domain.Entities;
 using EventsApi.Domain.Enums;
-using events_api.IntegrationTests.Fixtures;
 using EventsApi.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace events_api.IntegrationTests.Tests;
+namespace EventsApi.IntegrationTests.Tests;
 
 public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
 {
@@ -17,27 +17,35 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
         _fixture = fixture;
     }
 
-    private async Task<(Event Event, BookingRepository BookingRepo, EventRepository EventRepo)> SetupAsync()
+    private async Task<(Event Event, User User, BookingRepository BookingRepo, EventRepository EventRepo)> SetupAsync()
     {
         await _fixture.ResetDatabaseAsync();
 
         var eventRepo = new EventRepository(_fixture.DbContext);
         var bookingRepo = new BookingRepository(_fixture.DbContext);
 
-        var eventItem = new Event("Тестовое событие", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10);
+        var user = new User("testuser", "hashedpassword");
+        await _fixture.DbContext.Users.AddAsync(user);
+
+        var eventItem = new Event(
+            "Тестовое событие",
+            DateTime.UtcNow.AddDays(1),
+            DateTime.UtcNow.AddDays(2),
+            10
+        );
         await eventRepo.AddAsync(eventItem);
 
-        return (eventItem, bookingRepo, eventRepo);
+        return (eventItem, user, bookingRepo, eventRepo);
     }
 
     [Fact]
     public async Task AddAsync_ShouldAddBookingToDatabase()
     {
         // Arrange
-        var (eventItem, bookingRepo, _) = await SetupAsync();
+        var (eventItem, user, bookingRepo, _) = await SetupAsync();
 
         // Act
-        var booking = new Booking(eventItem.Id);
+        var booking = new Booking(eventItem.Id, user.Id);
         await bookingRepo.AddAsync(booking);
 
         // Assert
@@ -46,6 +54,7 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
 
         saved.Should().NotBeNull();
         saved!.EventId.Should().Be(eventItem.Id);
+        saved.UserId.Should().Be(user.Id);
         saved.Status.Should().Be(BookingStatus.Pending);
     }
 
@@ -53,9 +62,9 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
     public async Task GetByIdAsync_WithExistingId_ShouldReturnBooking()
     {
         // Arrange
-        var (eventItem, bookingRepo, _) = await SetupAsync();
+        var (eventItem, user, bookingRepo, _) = await SetupAsync();
 
-        var booking = new Booking(eventItem.Id);
+        var booking = new Booking(eventItem.Id, user.Id);
         await bookingRepo.AddAsync(booking);
 
         // Act
@@ -65,6 +74,7 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
         result.Should().NotBeNull();
         result!.Id.Should().Be(booking.Id);
         result.EventId.Should().Be(eventItem.Id);
+        result.UserId.Should().Be(user.Id);
     }
 
     [Fact]
@@ -85,10 +95,10 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
     public async Task GetByEventIdAsync_ShouldReturnBookingsForEvent()
     {
         // Arrange
-        var (eventItem, bookingRepo, _) = await SetupAsync();
+        var (eventItem, user, bookingRepo, _) = await SetupAsync();
 
-        var booking1 = new Booking(eventItem.Id);
-        var booking2 = new Booking(eventItem.Id);
+        var booking1 = new Booking(eventItem.Id, user.Id);
+        var booking2 = new Booking(eventItem.Id, user.Id);
         await bookingRepo.AddAsync(booking1);
         await bookingRepo.AddAsync(booking2);
 
@@ -104,10 +114,10 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
     public async Task GetPendingAsync_ShouldReturnOnlyPendingBookings()
     {
         // Arrange
-        var (eventItem, bookingRepo, _) = await SetupAsync();
+        var (eventItem, user, bookingRepo, _) = await SetupAsync();
 
-        var pendingBooking = new Booking(eventItem.Id);
-        var confirmedBooking = new Booking(eventItem.Id);
+        var pendingBooking = new Booking(eventItem.Id, user.Id);
+        var confirmedBooking = new Booking(eventItem.Id, user.Id);
         confirmedBooking.Confirm();
 
         await bookingRepo.AddAsync(pendingBooking);
@@ -122,12 +132,38 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
+    public async Task GetActiveByUserAsync_ShouldReturnPendingAndConfirmedBookings()
+    {
+        // Arrange
+        var (eventItem, user, bookingRepo, _) = await SetupAsync();
+
+        var pending = new Booking(eventItem.Id, user.Id);
+        var confirmed = new Booking(eventItem.Id, user.Id);
+        confirmed.Confirm();
+        var cancelled = new Booking(eventItem.Id, user.Id);
+        cancelled.Cancel();
+
+        await bookingRepo.AddAsync(pending);
+        await bookingRepo.AddAsync(confirmed);
+        await bookingRepo.AddAsync(cancelled);
+
+        // Act
+        var active = await bookingRepo.GetActiveByUserAsync(user.Id);
+
+        // Assert
+        active.Should().HaveCount(2);
+        active.Should().Contain(b => b.Status == BookingStatus.Pending);
+        active.Should().Contain(b => b.Status == BookingStatus.Confirmed);
+        active.Should().NotContain(b => b.Status == BookingStatus.Cancelled);
+    }
+
+    [Fact]
     public async Task UpdateAsync_ShouldUpdateBooking()
     {
         // Arrange
-        var (eventItem, bookingRepo, _) = await SetupAsync();
+        var (eventItem, user, bookingRepo, _) = await SetupAsync();
 
-        var booking = new Booking(eventItem.Id);
+        var booking = new Booking(eventItem.Id, user.Id);
         await bookingRepo.AddAsync(booking);
 
         // Act
@@ -145,9 +181,9 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
     public async Task DeleteAsync_ShouldDeleteBooking()
     {
         // Arrange
-        var (eventItem, bookingRepo, _) = await SetupAsync();
+        var (eventItem, user, bookingRepo, _) = await SetupAsync();
 
-        var booking = new Booking(eventItem.Id);
+        var booking = new Booking(eventItem.Id, user.Id);
         await bookingRepo.AddAsync(booking);
 
         // Act
@@ -162,9 +198,9 @@ public class BookingRepositoryTests : IClassFixture<TestDatabaseFixture>
     public async Task ExistsAsync_ShouldReturnTrueForExistingBooking()
     {
         // Arrange
-        var (eventItem, bookingRepo, _) = await SetupAsync();
+        var (eventItem, user, bookingRepo, _) = await SetupAsync();
 
-        var booking = new Booking(eventItem.Id);
+        var booking = new Booking(eventItem.Id, user.Id);
         await bookingRepo.AddAsync(booking);
 
         // Act

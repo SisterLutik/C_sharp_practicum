@@ -1,5 +1,7 @@
 ﻿using EventsApi.Application.DTOs;
 using EventsApi.Application.Interfaces;
+using EventsApi.Domain.Enums;
+using EventsApi.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventsApi.Presentation.Controllers;
@@ -31,5 +33,16 @@ public class BookingsController : ControllerBase
         };
 
         return Ok(response);
+    }
+
+    [HttpPost("{id}/cancel")]
+    public async Task<IActionResult> Cancel(Guid id)
+    {
+        var userId = Guid.Parse(HttpContext.User.FindFirst("sub")?.Value
+                                ?? throw new ForbiddenOperationException("Не аутентифицирован"));
+        var role = Enum.Parse<UserRole>(HttpContext.User.FindFirst("role")?.Value ?? "User");
+
+        await _bookingService.CancelBookingAsync(id, userId, role);
+        return NoContent();
     }
 }

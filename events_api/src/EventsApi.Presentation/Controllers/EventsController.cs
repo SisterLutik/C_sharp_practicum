@@ -1,5 +1,8 @@
 using EventsApi.Application.DTOs;
 using EventsApi.Application.Interfaces;
+using EventsApi.Domain.Entities;
+using EventsApi.Domain.Enums;
+using EventsApi.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventsApi.Presentation.Controllers;
@@ -72,15 +75,26 @@ public class EventsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// POST /api/events/{id}/book — создать бронь для события.
+    /// </summary>
     [HttpPost("{id}/book")]
     public async Task<IActionResult> CreateBooking(Guid id)
     {
-        var booking = await _bookingService.CreateBookingAsync(id);
+        // TODO: заменить на реальную аутентификацию
+        var userIdClaim = HttpContext.User.FindFirst("sub")?.Value;
+        if (string.IsNullOrEmpty(userIdClaim))
+            throw new ForbiddenOperationException("Не аутентифицирован");
+
+        var userId = Guid.Parse(userIdClaim);
+
+        var booking = await _bookingService.CreateBookingAsync(id, userId);
 
         var response = new BookingResponse
         {
             Id = booking.Id,
             EventId = booking.EventId,
+            UserId = booking.UserId,
             Status = booking.Status,
             CreatedAt = booking.CreatedAt,
             ProcessedAt = booking.ProcessedAt
@@ -89,7 +103,10 @@ public class EventsController : ControllerBase
         return Accepted(new Uri($"/api/bookings/{booking.Id}", UriKind.Relative), response);
     }
 
-    private static EventResponse ToResponse(Domain.Entities.Event e) => new()
+    // =============================================
+    // 🔧 Приватный маппинг Domain → DTO
+    // =============================================
+    private static EventResponse ToResponse(Event e) => new()
     {
         Id = e.Id,
         Title = e.Title,

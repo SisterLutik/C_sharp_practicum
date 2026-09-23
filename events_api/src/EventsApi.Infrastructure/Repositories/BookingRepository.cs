@@ -65,5 +65,12 @@ namespace EventsApi.Infrastructure
         {
             return await _context.Bookings.AnyAsync(b => b.Id == id);
         }
+        public async Task<List<Booking>> GetActiveByUserAsync(Guid userId)
+        {
+            return await _context.Bookings
+                .Where(b => b.UserId == userId
+                         && (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed))
+                .ToListAsync();
+        }
     }
 }

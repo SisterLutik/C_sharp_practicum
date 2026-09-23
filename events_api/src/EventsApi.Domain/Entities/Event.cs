@@ -76,5 +76,6 @@ namespace EventsApi.Domain.Entities
                 );
             }
         }
+        public bool HasStarted() => StartAt <= DateTime.UtcNow;
     }
 }

@@ -1,11 +1,11 @@
-﻿using EventsApi.Infrastructure.DataAccess.Repositories;
-using events_api.IntegrationTests.Fixtures;
+﻿using events_api.IntegrationTests.Fixtures;
 using EventsApi.Domain.Entities;
+using EventsApi.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace events_api.IntegrationTests.Tests;
+namespace EventsApi.IntegrationTests.Tests;
 
 public class EventRepositoryTests : IClassFixture<TestDatabaseFixture>
 {
@@ -40,6 +40,60 @@ public class EventRepositoryTests : IClassFixture<TestDatabaseFixture>
 
         saved.Should().NotBeNull();
         saved!.Title.Should().Be("Интеграционное событие");
+        saved.Description.Should().Be("Тестовое описание");
+        saved.TotalSeats.Should().Be(50);
+        saved.AvailableSeats.Should().Be(50);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithExistingId_ShouldReturnEvent()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var repository = new EventRepository(_fixture.DbContext);
+
+        var eventItem = new Event("Тест", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10);
+        await repository.AddAsync(eventItem);
+
+        // Act
+        var result = await repository.GetByIdAsync(eventItem.Id);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(eventItem.Id);
+        result.Title.Should().Be("Тест");
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithNonExistingId_ShouldReturnNull()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var repository = new EventRepository(_fixture.DbContext);
+
+        // Act
+        var result = await repository.GetByIdAsync(Guid.NewGuid());
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithTitleFilter_ShouldReturnMatchingEvents()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var repository = new EventRepository(_fixture.DbContext);
+
+        await repository.AddAsync(new Event("Уникальное название", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10));
+        await repository.AddAsync(new Event("Другое событие", DateTime.UtcNow.AddDays(3), DateTime.UtcNow.AddDays(4), 10));
+
+        // Act
+        var result = await repository.GetAllAsync("уникальное", null, null, 1, 10);
+
+        // Assert
+        result.Items.Should().HaveCount(1);
+        result.Items.First().Title.Should().Be("Уникальное название");
     }
 
     [Fact]
@@ -100,5 +154,77 @@ public class EventRepositoryTests : IClassFixture<TestDatabaseFixture>
         result.PageSize.Should().Be(10);
         result.Items.Should().HaveCount(10);
         result.TotalCount.Should().BeGreaterThanOrEqualTo(25);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ShouldUpdateEvent()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var repository = new EventRepository(_fixture.DbContext);
+
+        var eventItem = new Event("Старое название", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10);
+        await repository.AddAsync(eventItem);
+
+        eventItem.UpdateDetails("Новое название", "Новое описание", DateTime.UtcNow.AddDays(3), DateTime.UtcNow.AddDays(4), 20);
+
+        // Act
+        await repository.UpdateAsync(eventItem);
+
+        // Assert
+        var updated = await repository.GetByIdAsync(eventItem.Id);
+        updated.Should().NotBeNull();
+        updated!.Title.Should().Be("Новое название");
+        updated.Description.Should().Be("Новое описание");
+        updated.TotalSeats.Should().Be(20);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldDeleteEvent()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var repository = new EventRepository(_fixture.DbContext);
+
+        var eventItem = new Event("Событие для удаления", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10);
+        await repository.AddAsync(eventItem);
+
+        // Act
+        await repository.DeleteAsync(eventItem.Id);
+
+        // Assert
+        var result = await repository.GetByIdAsync(eventItem.Id);
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ExistsAsync_ShouldReturnTrueForExistingEvent()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var repository = new EventRepository(_fixture.DbContext);
+
+        var eventItem = new Event("Тест", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10);
+        await repository.AddAsync(eventItem);
+
+        // Act
+        var exists = await repository.ExistsAsync(eventItem.Id);
+
+        // Assert
+        exists.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExistsAsync_ShouldReturnFalseForNonExistingEvent()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var repository = new EventRepository(_fixture.DbContext);
+
+        // Act
+        var exists = await repository.ExistsAsync(Guid.NewGuid());
+
+        // Assert
+        exists.Should().BeFalse();
     }
 }

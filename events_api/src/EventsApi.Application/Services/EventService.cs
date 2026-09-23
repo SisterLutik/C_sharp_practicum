@@ -47,7 +47,8 @@ public class EventService : IEventService
         return newEvent;
     }
 
-    public async Task<Event> UpdateAsync(Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
+    public async Task<Event> UpdateAsync(
+        Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
         var existingEvent = await _eventRepository.GetByIdAsync(id)
             ?? throw new NotFoundException($"Событие с id {id} не найдено");
