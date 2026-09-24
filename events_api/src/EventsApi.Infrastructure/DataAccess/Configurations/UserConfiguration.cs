@@ -15,12 +15,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasKey(u => u.Id);
         builder.Property(u => u.Id).ValueGeneratedNever();
 
-        // 3. Ограничения
+        // 3. Уникальный индекс на логин
         builder.Property(u => u.Login)
             .IsRequired()
             .HasMaxLength(100);
 
-        builder.HasIndex(u => u.Login).IsUnique();
+        builder.HasIndex(u => u.Login)
+            .IsUnique()
+            .HasDatabaseName("IX_Users_Login");
 
         builder.Property(u => u.PasswordHash)
             .IsRequired()
@@ -28,6 +30,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.Role)
             .IsRequired()
-            .HasConversion<string>();
+            .HasConversion<string>()
+            .HasMaxLength(20);
     }
 }

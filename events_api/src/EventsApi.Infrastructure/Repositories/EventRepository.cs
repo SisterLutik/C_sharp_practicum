@@ -2,6 +2,7 @@
 using EventsApi.Application.Interfaces;
 using EventsApi.Application.DTOs;
 using Microsoft.EntityFrameworkCore;
+using EventsApi.Infrastructure.DataAccess;
 
 namespace EventsApi.Infrastructure
 {

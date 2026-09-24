@@ -15,21 +15,13 @@ public class UserRepository : IUserRepository
     }
 
     public async Task<User?> GetByIdAsync(Guid id)
-    {
-        return await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == id);
-    }
+        => await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
 
     public async Task<User?> GetByLoginAsync(string login)
-    {
-        return await _context.Users
-            .FirstOrDefaultAsync(u => u.Login == login);
-    }
+        => await _context.Users.FirstOrDefaultAsync(u => u.Login == login);
 
     public async Task<bool> ExistsByLoginAsync(string login)
-    {
-        return await _context.Users.AnyAsync(u => u.Login == login);
-    }
+        => await _context.Users.AnyAsync(u => u.Login == login);
 
     public async Task AddAsync(User user)
     {

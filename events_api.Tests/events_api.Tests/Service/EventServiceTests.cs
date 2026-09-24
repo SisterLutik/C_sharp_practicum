@@ -9,6 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using EventsApi.Infrastructure.DataAccess;
+
 
 namespace EventsApi.Tests.Services;
 

@@ -3,6 +3,7 @@ using EventsApi.Application.Interfaces;
 using EventsApi.Application.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using EventsApi.Infrastructure.DataAccess;
 
 namespace events_api.Tests.Helpers
 {

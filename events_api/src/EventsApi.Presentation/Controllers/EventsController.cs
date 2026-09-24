@@ -4,6 +4,7 @@ using EventsApi.Domain.Entities;
 using EventsApi.Domain.Enums;
 using EventsApi.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace EventsApi.Presentation.Controllers;
 
@@ -79,12 +80,11 @@ public class EventsController : ControllerBase
     /// POST /api/events/{id}/book — создать бронь для события.
     /// </summary>
     [HttpPost("{id}/book")]
+    [Authorize]
     public async Task<IActionResult> CreateBooking(Guid id)
     {
-        // TODO: заменить на реальную аутентификацию
-        var userIdClaim = HttpContext.User.FindFirst("sub")?.Value;
-        if (string.IsNullOrEmpty(userIdClaim))
-            throw new ForbiddenOperationException("Не аутентифицирован");
+        var userIdClaim = HttpContext.User.FindFirst("sub")?.Value
+            ?? throw new ForbiddenOperationException("Не аутентифицирован");
 
         var userId = Guid.Parse(userIdClaim);
 

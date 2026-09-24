@@ -2,6 +2,8 @@
 using EventsApi.Application.Interfaces;
 using EventsApi.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using EventsApi.Infrastructure.DataAccess;
+using EventsApi.Infrastructure.DataAccess;
 
 
 namespace EventsApi.Infrastructure

@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 using Xunit;
+using EventsApi.Infrastructure.DataAccess;
 
 namespace events_api.IntegrationTests.Fixtures;
 
