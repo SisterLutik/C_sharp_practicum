@@ -8,20 +8,22 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================
-// 1. РЕГИСТРАЦИЯ СЕРВИСОВ (ДО Build)
+// 1. Сервисы
 // ============================================
-
 builder.Services.AddControllers();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddHostedService<BookingBackgroundService>();
 
-// JWT Authentication
+// ============================================
+// 2. JWT Authentication
+// ============================================
 var jwtSection = builder.Configuration.GetSection(JwtSettings.SectionName);
 var jwtSecret = jwtSection["Secret"]!;
 
@@ -42,12 +44,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Swagger
+// ============================================
+// 3. Swagger (без AddSecurityRequirement)
+// ============================================
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Events API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Events API",
+        Version = "v1"
+    });
 
+    // Только схема — кнопка Authorize появится в Swagger UI
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -55,33 +64,27 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Введите JWT-токен"
+        Description = "Введите JWT-токен (без слова 'Bearer')"
     });
-
 });
 
-// ============================================
-// 2. BUILD
-// ============================================
 var app = builder.Build();
 
 // ============================================
-// 3. MIDDLEWARE (ПОСЛЕ Build)
+// 4. Миграции
 // ============================================
-
-// Миграции
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
 
-// Глобальная обработка исключений — первой
+// ============================================
+// 5. Middleware pipeline
+// ============================================
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
-
 app.UseHttpsRedirection();
 
-// Swagger — только в Development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

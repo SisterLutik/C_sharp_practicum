@@ -69,4 +69,25 @@ public class UserService : IUserService
             Token = token
         };
     }
+    public async Task<AuthResponse> RegisterAsync(string login, string password, UserRole role = UserRole.User)
+    {
+        if (await _userRepository.ExistsByLoginAsync(login))
+            throw new ValidationException($"Пользователь с логином '{login}' уже существует");
+
+        var passwordHash = _passwordHasher.Hash(password);
+        var user = new User(login, passwordHash, role);
+
+        await _userRepository.AddAsync(user);
+        _logger.LogInformation($"Зарегистрирован пользователь {user.Login} ({user.Id}) с ролью {user.Role}");
+
+        var token = _tokenService.GenerateToken(user.Id, user.Login, user.Role);
+
+        return new AuthResponse
+        {
+            UserId = user.Id,
+            Login = user.Login,
+            Role = user.Role,
+            Token = token
+        };
+    }
 }

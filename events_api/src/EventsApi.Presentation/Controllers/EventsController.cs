@@ -1,10 +1,8 @@
 using EventsApi.Application.DTOs;
 using EventsApi.Application.Interfaces;
-using EventsApi.Domain.Entities;
-using EventsApi.Domain.Enums;
 using EventsApi.Domain.Exceptions;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace EventsApi.Presentation.Controllers;
 
@@ -21,6 +19,7 @@ public class EventsController : ControllerBase
         _bookingService = bookingService;
     }
 
+    // GET /api/events — доступен всем
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? title,
@@ -44,23 +43,24 @@ public class EventsController : ControllerBase
     public async Task<IActionResult> GetById(Guid id)
     {
         var eventItem = await _eventService.GetByIdAsync(id);
-        if (eventItem == null)
-            return NotFound();
-
+        if (eventItem == null) return NotFound();
         return Ok(ToResponse(eventItem));
     }
 
+    // POST /api/events — только Admin
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
     {
         var newEvent = await _eventService.CreateEventAsync(
             request.Title, request.Description, request.StartAt, request.EndAt, request.TotalSeats);
 
-        var response = ToResponse(newEvent);
-        return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, response);
+        return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, ToResponse(newEvent));
     }
 
+    // PUT /api/events/{id} — только Admin
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
         var updated = await _eventService.UpdateAsync(
@@ -69,25 +69,21 @@ public class EventsController : ControllerBase
         return Ok(ToResponse(updated));
     }
 
+    // DELETE /api/events/{id} — только Admin
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _eventService.DeleteAsync(id);
         return NoContent();
     }
 
-    /// <summary>
-    /// POST /api/events/{id}/book — создать бронь для события.
-    /// </summary>
+    // POST /api/events/{id}/book — только аутентифицированные
     [HttpPost("{id}/book")]
     [Authorize]
     public async Task<IActionResult> CreateBooking(Guid id)
     {
-        var userIdClaim = HttpContext.User.FindFirst("sub")?.Value
-            ?? throw new ForbiddenOperationException("Не аутентифицирован");
-
-        var userId = Guid.Parse(userIdClaim);
-
+        var userId = GetCurrentUserId();
         var booking = await _bookingService.CreateBookingAsync(id, userId);
 
         var response = new BookingResponse
@@ -103,10 +99,14 @@ public class EventsController : ControllerBase
         return Accepted(new Uri($"/api/bookings/{booking.Id}", UriKind.Relative), response);
     }
 
-    // =============================================
-    // 🔧 Приватный маппинг Domain → DTO
-    // =============================================
-    private static EventResponse ToResponse(Event e) => new()
+    private Guid GetCurrentUserId()
+    {
+        var claim = HttpContext.User.FindFirst("sub")?.Value
+            ?? throw new ForbiddenOperationException("Не аутентифицирован");
+        return Guid.Parse(claim);
+    }
+
+    private static EventResponse ToResponse(Domain.Entities.Event e) => new()
     {
         Id = e.Id,
         Title = e.Title,

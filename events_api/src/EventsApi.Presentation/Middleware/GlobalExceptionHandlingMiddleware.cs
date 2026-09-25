@@ -1,5 +1,4 @@
-﻿using System.Text.Json;
-using EventsApi.Domain.Exceptions;
+﻿using EventsApi.Domain.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
@@ -47,19 +46,27 @@ public class GlobalExceptionHandlingMiddleware
         });
     }
 
-
     private static int MapStatusCode(Exception ex) => ex switch
     {
-        NoAvailableSeatsException => StatusCodes.Status409Conflict,
-        BookingAlreadyCancelledException => StatusCodes.Status409Conflict,
-        BookingLimitExceededException => StatusCodes.Status409Conflict,
-        EventAlreadyStartedException => StatusCodes.Status400BadRequest,
+        // 403 — нет прав
         ForbiddenOperationException => StatusCodes.Status403Forbidden,
-        NotFoundException => StatusCodes.Status404NotFound,
+
+        // 400 — событие в прошлом / валидация
+        EventAlreadyStartedException => StatusCodes.Status400BadRequest,
         ValidationException => StatusCodes.Status400BadRequest,
         ArgumentException => StatusCodes.Status400BadRequest,
         InvalidOperationException => StatusCodes.Status400BadRequest,
+
+        // 409 — конфликты (лимит, нет мест, повторная отмена)
+        BookingLimitExceededException => StatusCodes.Status409Conflict,
+        NoAvailableSeatsException => StatusCodes.Status409Conflict,
+        BookingAlreadyCancelledException => StatusCodes.Status409Conflict,
+
+        // 404
+        NotFoundException => StatusCodes.Status404NotFound,
         KeyNotFoundException => StatusCodes.Status404NotFound,
+
+        // 500
         _ => StatusCodes.Status500InternalServerError
     };
 }

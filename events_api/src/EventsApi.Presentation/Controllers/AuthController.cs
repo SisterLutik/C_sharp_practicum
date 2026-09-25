@@ -16,20 +16,16 @@ public class AuthController : ControllerBase
         _userService = userService;
     }
 
-    /// <summary>
     /// POST /api/auth/register — регистрация нового пользователя.
-    /// </summary>
     [HttpPost("register")]
     [AllowAnonymous]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        var result = await _userService.RegisterAsync(request.Login, request.Password);
+        var result = await _userService.RegisterAsync(request.Login, request.Password, request.Role);
         return Ok(result);
     }
 
-    /// <summary>
     /// POST /api/auth/login — вход в систему.
-    /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)

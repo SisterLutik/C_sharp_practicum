@@ -4,6 +4,7 @@ using EventsApi.Domain.Enums;
 using EventsApi.Domain.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace EventsApi.Presentation.Controllers;
 
@@ -18,6 +19,7 @@ public class BookingsController : ControllerBase
         _bookingService = bookingService;
     }
 
+    // GET /api/bookings/{id} — только аутентифицированные
     [HttpGet("{id}")]
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
@@ -35,21 +37,28 @@ public class BookingsController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// POST /api/bookings/{id}/cancel — отменить бронь.
-    /// </summary>
-    [HttpPost("{id}/cancel")]
+    // DELETE /api/bookings/{id} — только аутентифицированные (владелец или админ)
+    [HttpDelete("{id}")]
     [Authorize]
-    public async Task<IActionResult> Cancel(Guid id)
+    public async Task<IActionResult> Delete(Guid id)
     {
-        var userIdClaim = HttpContext.User.FindFirst("sub")?.Value
-            ?? throw new ForbiddenOperationException("Не аутентифицирован");
-        var roleClaim = HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
-
-        var userId = Guid.Parse(userIdClaim);
-        var role = Enum.Parse<UserRole>(roleClaim);
+        var userId = GetCurrentUserId();
+        var role = GetCurrentRole();
 
         await _bookingService.CancelBookingAsync(id, userId, role);
         return NoContent();
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var claim = HttpContext.User.FindFirst("sub")?.Value
+            ?? throw new ForbiddenOperationException("Не аутентифицирован");
+        return Guid.Parse(claim);
+    }
+
+    private UserRole GetCurrentRole()
+    {
+        var claim = HttpContext.User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
+        return Enum.Parse<UserRole>(claim);
     }
 }
