@@ -8,7 +8,7 @@ namespace EventsApi.Application.Services;
 
 public class BookingService : IBookingService
 {
-    private const int MaxActiveBookingsPerUser = 3;
+    private const int MaxActiveBookingsPerUser = 10;
 
     private readonly IEventRepository _eventRepository;
     private readonly IBookingRepository _bookingRepository;

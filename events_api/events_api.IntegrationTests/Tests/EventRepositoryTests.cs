@@ -1,6 +1,6 @@
 ﻿using events_api.IntegrationTests.Fixtures;
 using EventsApi.Domain.Entities;
-using EventsApi.Infrastructure;
+using EventsApi.Infrastructure.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
