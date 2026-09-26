@@ -32,11 +32,11 @@ public class UserService : IUserService
             throw new ValidationException($"Пользователь с логином '{login}' уже существует");
 
         var passwordHash = _passwordHasher.Hash(password);
+
         var user = new User(login, passwordHash, UserRole.User);
 
         await _userRepository.AddAsync(user);
-
-        _logger.LogInformation($"Зарегистрирован пользователь {user.Login} ({user.Id})");
+        _logger.LogInformation($"Зарегистрирован пользователь {user.Login} ({user.Id}) с ролью User");
 
         var token = _tokenService.GenerateToken(user.Id, user.Login, user.Role);
 

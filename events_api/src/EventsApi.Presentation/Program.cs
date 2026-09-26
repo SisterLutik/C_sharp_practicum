@@ -1,5 +1,8 @@
 using EventsApi.Application;
+using EventsApi.Application.Interfaces;
 using EventsApi.Application.Settings;
+using EventsApi.Domain.Entities;
+using EventsApi.Domain.Enums;
 using EventsApi.Infrastructure;
 using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Presentation.BackgroundServices;
@@ -8,8 +11,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================
@@ -76,6 +81,15 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+    if (!await userRepo.ExistsByLoginAsync("admin"))
+    {
+        var admin = new User("admin", hasher.Hash("admin123"), UserRole.Admin);
+        await userRepo.AddAsync(admin);
+    }
 }
 
 // ============================================

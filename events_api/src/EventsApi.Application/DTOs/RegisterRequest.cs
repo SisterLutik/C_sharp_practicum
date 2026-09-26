@@ -13,10 +13,4 @@ public class RegisterRequest
     [Required(ErrorMessage = "Пароль обязателен")]
     [MinLength(6)]
     public string Password { get; set; } = null!;
-
-    /// <summary>
-    /// Необязательное поле. По умолчанию User.
-    /// Для тестирования можно передать Admin.
-    /// </summary>
-    public UserRole Role { get; set; } = UserRole.User;
 }
