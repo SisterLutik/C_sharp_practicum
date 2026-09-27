@@ -41,7 +41,7 @@ public class BookingServiceTests : IDisposable
     }
 
     // =============================================
-    // 🔧 Вспомогательный метод
+    //  Вспомогательный метод
     // =============================================
 
     private async Task<(Event Event, User User)> SetupAsync(
@@ -629,8 +629,33 @@ public class BookingServiceTests : IDisposable
         newBooking.Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task CancelBookingAsync_ForStartedEvent_ShouldThrowEventAlreadyStartedException()
+    {
+        // Arrange — событие началось вчера
+        var (eventItem, user) = await SetupAsync(
+            totalSeats: 10,
+            startAt: DateTime.UtcNow.AddDays(-2),
+            endAt: DateTime.UtcNow.AddDays(-1));
+
+        using var scope = _serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
+        // Создаём бронь напрямую через репозиторий (сервис не даст — событие в прошлом)
+        var booking = new Booking(eventItem.Id, user.Id);
+        await context.Bookings.AddAsync(booking);
+        await context.SaveChangesAsync();
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<EventAlreadyStartedException>(() =>
+            bookingService.CancelBookingAsync(booking.Id, user.Id, UserRole.User));
+
+        exception.Message.Should().Contain("уже началось");
+    }
+
     // =============================================
-    // 🔧 Dispose
+    //  Dispose
     // =============================================
 
     public void Dispose()

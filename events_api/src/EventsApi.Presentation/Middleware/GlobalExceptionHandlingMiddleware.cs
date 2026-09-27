@@ -48,6 +48,9 @@ public class GlobalExceptionHandlingMiddleware
 
     private static int MapStatusCode(Exception ex) => ex switch
     {
+        // 401 — неверные учётные данные
+        InvalidCredentialsException => StatusCodes.Status401Unauthorized,
+
         // 403 — нет прав
         ForbiddenOperationException => StatusCodes.Status403Forbidden,
 
@@ -57,7 +60,7 @@ public class GlobalExceptionHandlingMiddleware
         ArgumentException => StatusCodes.Status400BadRequest,
         InvalidOperationException => StatusCodes.Status400BadRequest,
 
-        // 409 — конфликты (лимит, нет мест, повторная отмена)
+        // 409 — конфликты
         BookingLimitExceededException => StatusCodes.Status409Conflict,
         NoAvailableSeatsException => StatusCodes.Status409Conflict,
         BookingAlreadyCancelledException => StatusCodes.Status409Conflict,

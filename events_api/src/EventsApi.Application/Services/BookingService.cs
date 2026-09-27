@@ -72,19 +72,26 @@ public class BookingService : IBookingService
         var booking = await _bookingRepository.GetByIdAsync(bookingId)
             ?? throw new NotFoundException($"Бронь с id {bookingId} не найдена");
 
+        // Проверка прав
         if (booking.UserId != requestingUserId && role != UserRole.Admin)
             throw new ForbiddenOperationException("Нет прав на отмену этой брони");
 
+        // Проверка: событие ещё не началось
+        var eventEntity = await _eventRepository.GetByIdAsync(booking.EventId)
+            ?? throw new NotFoundException($"Событие с id {booking.EventId} не найдено");
+
+        if (eventEntity.HasStarted())
+            throw new EventAlreadyStartedException("Нельзя отменить бронь на событие, которое уже началось");
+
+        // Доменный метод Cancel() (защита от повторной отмены внутри)
         booking.Cancel();
 
-        var eventEntity = await _eventRepository.GetByIdAsync(booking.EventId);
-        if (eventEntity != null)
-        {
-            eventEntity.ReleaseSeats();
-            await _eventRepository.UpdateAsync(eventEntity);
-        }
+        // Возвращаем место в пул
+        eventEntity.ReleaseSeats();
+        await _eventRepository.UpdateAsync(eventEntity);
 
         await _bookingRepository.UpdateAsync(booking);
+
         _logger.LogInformation($"Бронь {booking.Id} отменена пользователем {requestingUserId}");
     }
 }

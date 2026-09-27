@@ -52,10 +52,10 @@ public class UserService : IUserService
     public async Task<AuthResponse> LoginAsync(string login, string password)
     {
         var user = await _userRepository.GetByLoginAsync(login)
-            ?? throw new ValidationException("Неверный логин или пароль");
+            ?? throw new InvalidCredentialsException("Неверный логин или пароль");
 
         if (!_passwordHasher.Verify(password, user.PasswordHash))
-            throw new ValidationException("Неверный логин или пароль");
+            throw new InvalidCredentialsException("Неверный логин или пароль");
 
         var token = _tokenService.GenerateToken(user.Id, user.Login, user.Role);
 
