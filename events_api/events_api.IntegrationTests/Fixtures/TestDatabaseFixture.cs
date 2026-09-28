@@ -4,7 +4,7 @@ using Testcontainers.PostgreSql;
 using Xunit;
 using EventsApi.Infrastructure.DataAccess;
 
-namespace events_api.IntegrationTests.Fixtures;
+namespace EventsApi.IntegrationTests.Fixtures;
 
 public class TestDatabaseFixture : IAsyncLifetime
 {
@@ -13,7 +13,7 @@ public class TestDatabaseFixture : IAsyncLifetime
 
     public TestDatabaseFixture()
     {
-        _postgresContainer = new PostgreSqlBuilder()
+        _postgresContainer = new PostgreSqlBuilder().WithImage("postgres:16-alpine")
             .WithImage("postgres:16-alpine")
             .WithDatabase("events_test")
             .WithUsername("postgres")

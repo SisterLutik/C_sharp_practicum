@@ -1,4 +1,4 @@
-﻿using events_api.IntegrationTests.Fixtures;
+﻿using EventsApi.IntegrationTests.Fixtures;
 using EventsApi.Domain.Entities;
 using EventsApi.Domain.Enums;
 using EventsApi.Infrastructure;
