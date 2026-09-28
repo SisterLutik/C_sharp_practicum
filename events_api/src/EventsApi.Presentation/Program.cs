@@ -34,6 +34,7 @@ var jwtSecret = jwtSection["Secret"]!;
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;   // ОТКЛЮЧАЕТ маппинг claim-ов
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
