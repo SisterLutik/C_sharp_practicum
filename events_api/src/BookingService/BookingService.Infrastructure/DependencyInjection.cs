@@ -1,6 +1,7 @@
 ﻿using BookingService.Application.Interfaces;
 using BookingService.Infrastructure.DataAccess;
 using BookingService.Infrastructure.HttpClients;
+using BookingService.Infrastructure.Kafka;
 using BookingService.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -14,18 +15,20 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // DbContext
         services.AddDbContext<BookingDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-        // Репозитории
         services.AddScoped<IBookingRepository, BookingRepository>();
 
-        // HTTP-клиент к EventService (заготовка на будущее)
         services.AddHttpClient<IEventServiceClient, EventServiceClient>(client =>
         {
             client.BaseAddress = new Uri(configuration["Services:EventService:BaseUrl"]!);
+            client.Timeout = TimeSpan.FromSeconds(30);
         });
+
+        services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
+
+        services.AddSingleton<IEventPublisher, KafkaEventPublisher>();
 
         return services;
     }

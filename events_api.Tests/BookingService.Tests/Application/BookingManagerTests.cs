@@ -4,8 +4,8 @@ using BookingService.Domain.Entities;
 using BookingService.Domain.Enums;
 using BookingService.Domain.Exceptions;
 using EventsApi.Contracts.Events;
+using EventsApi.Contracts.Kafka;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -16,17 +16,22 @@ public class BookingManagerTests
 {
     private readonly Mock<IBookingRepository> _bookingRepoMock;
     private readonly Mock<IEventServiceClient> _eventClientMock;
+    private readonly Mock<IEventPublisher> _eventPublisherMock;   
     private readonly BookingManager _manager;
 
     public BookingManagerTests()
     {
         _bookingRepoMock = new Mock<IBookingRepository>();
         _eventClientMock = new Mock<IEventServiceClient>();
+        _eventPublisherMock = new Mock<IEventPublisher>();        
+
         _manager = new BookingManager(
             _bookingRepoMock.Object,
             _eventClientMock.Object,
+            _eventPublisherMock.Object,                           
             NullLogger<BookingManager>.Instance);
     }
+
 
     // ============================================
     // ✅ Успешные сценарии

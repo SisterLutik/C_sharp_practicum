@@ -1,6 +1,7 @@
-﻿using EventService.Infrastructure.Repositories;
-using EventService.Application.Interfaces;
+﻿using EventService.Application.Interfaces;
 using EventService.Infrastructure.DataAccess;
+using EventService.Infrastructure.Kafka;
+using EventService.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,12 +14,13 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // DbContext
         services.AddDbContext<EventDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-        // Репозитории
         services.AddScoped<IEventRepository, EventRepository>();
+
+        // Kafka
+        services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
 
         return services;
     }

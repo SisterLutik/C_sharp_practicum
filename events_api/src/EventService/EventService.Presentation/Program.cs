@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Text;
+using EventService.Infrastructure.Kafka;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,9 @@ builder.Services.AddControllers();
 // ============================================
 builder.Services.AddEventApplicationServices();
 builder.Services.AddEventInfrastructureServices(builder.Configuration);
+
+// ✅ Фоновый подписчик на Kafka
+builder.Services.AddHostedService<BookingConfirmedConsumer>();
 
 // ============================================
 // 3. JWT Authentication
