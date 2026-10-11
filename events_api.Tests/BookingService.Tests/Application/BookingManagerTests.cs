@@ -16,22 +16,21 @@ public class BookingManagerTests
 {
     private readonly Mock<IBookingRepository> _bookingRepoMock;
     private readonly Mock<IEventServiceClient> _eventClientMock;
-    private readonly Mock<IEventPublisher> _eventPublisherMock;   
+    private readonly Mock<IEventPublisher> _eventPublisherMock;
     private readonly BookingManager _manager;
 
     public BookingManagerTests()
     {
         _bookingRepoMock = new Mock<IBookingRepository>();
         _eventClientMock = new Mock<IEventServiceClient>();
-        _eventPublisherMock = new Mock<IEventPublisher>();        
+        _eventPublisherMock = new Mock<IEventPublisher>();
 
         _manager = new BookingManager(
             _bookingRepoMock.Object,
             _eventClientMock.Object,
-            _eventPublisherMock.Object,                           
+            _eventPublisherMock.Object,
             NullLogger<BookingManager>.Instance);
     }
-
 
     // ============================================
     // ✅ Успешные сценарии

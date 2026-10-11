@@ -26,8 +26,11 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
+        //  Kafka
         services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
 
+        //  Продюсер — Singleton: тяжёлый потокобезопасный объект,
+        // создаётся один раз и живёт всё время работы приложения.
         services.AddSingleton<IEventPublisher, KafkaEventPublisher>();
 
         return services;

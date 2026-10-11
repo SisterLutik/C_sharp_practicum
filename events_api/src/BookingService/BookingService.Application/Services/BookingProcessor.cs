@@ -48,6 +48,7 @@ public class BookingProcessor : IBookingProcessor
                 return;
             }
 
+            //  Подтверждаем бронь + публикуем в Kafka
             await _bookingService.ConfirmBookingAsync(bookingId);
 
             _logger.LogInformation("Бронь {BookingId} подтверждена", bookingId);

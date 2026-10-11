@@ -21,22 +21,45 @@ public class BookingBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _logger.LogInformation("BookingBackgroundService запущен");
+
         while (!stoppingToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateScope();
-            var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+            try
+            {
+                await ProcessPendingBookingsAsync(stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка в BookingBackgroundService");
+            }
 
-            var pendingBookings = await bookingRepository.GetPendingAsync();
-
-            var tasks = pendingBookings.Select(b =>
-                ProcessWithScopeAsync(b.Id, stoppingToken));
-
-            await Task.WhenAll(tasks);
             await Task.Delay(_pollingInterval, stoppingToken);
         }
+
+        _logger.LogInformation("BookingBackgroundService остановлен");
     }
 
-    private async Task ProcessWithScopeAsync(Guid bookingId, CancellationToken stoppingToken)
+    private async Task ProcessPendingBookingsAsync(CancellationToken stoppingToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var bookingRepo = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+
+        var pending = await bookingRepo.GetPendingAsync();
+        if (pending.Count == 0)
+            return;
+
+        _logger.LogInformation("Найдено {Count} броней в статусе Pending", pending.Count);
+
+        var tasks = pending.Select(b => ProcessWithOwnScopeAsync(b.Id, stoppingToken));
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task ProcessWithOwnScopeAsync(Guid bookingId, CancellationToken stoppingToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var processor = scope.ServiceProvider.GetRequiredService<IBookingProcessor>();

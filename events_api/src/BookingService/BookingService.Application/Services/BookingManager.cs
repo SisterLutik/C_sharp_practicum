@@ -30,36 +30,36 @@ public class BookingManager : IBookingService
     }
 
     // ============================================
-    // ✅ CreateBookingAsync(Guid, Guid)
+    // 1️⃣ CreateBookingAsync(Guid eventId, Guid userId)
     // ============================================
     public async Task<Booking> CreateBookingAsync(Guid eventId, Guid userId)
     {
         await _bookingSemaphore.WaitAsync();
         try
         {
-            // 1. Событие существует?
+            // Событие существует?
             var eventDto = await _eventServiceClient.GetEventAsync(eventId);
             if (eventDto == null)
                 throw new NotFoundException($"Событие с id {eventId} не найдено");
 
-            // 2. Событие ещё не началось?
+            // Событие ещё не началось?
             if (eventDto.StartAt <= DateTime.UtcNow)
                 throw new EventAlreadyStartedException(
                     "Нельзя забронировать событие, которое уже началось");
 
-            // 3. Лимит активных броней
+            // Лимит активных броней
             var activeBookings = await _bookingRepository.GetActiveByUserAsync(userId);
             if (activeBookings.Count >= MaxActiveBookingsPerUser)
                 throw new BookingLimitExceededException(
                     $"Превышен лимит активных броней ({MaxActiveBookingsPerUser})");
 
-            // 4. Резервируем место
+            // Резервируем место в EventService
             var reserveResult = await _eventServiceClient.TryReserveSeatsAsync(eventId);
             if (!reserveResult.Success)
                 throw new NoAvailableSeatsException(
                     reserveResult.Reason ?? "No available seats for this event");
 
-            // 5. Создаём бронь
+            // Создаём бронь
             var booking = new Booking(eventId, userId);
             await _bookingRepository.AddAsync(booking);
 
@@ -76,7 +76,7 @@ public class BookingManager : IBookingService
     }
 
     // ============================================
-    // ✅ GetBookingByIdAsync(Guid)
+    // 2️⃣ GetBookingByIdAsync(Guid bookingId)
     // ============================================
     public async Task<Booking> GetBookingByIdAsync(Guid bookingId)
     {
@@ -87,7 +87,7 @@ public class BookingManager : IBookingService
     }
 
     // ============================================
-    // ✅ CancelBookingAsync(Guid, Guid, bool)
+    // 3️⃣ CancelBookingAsync(Guid bookingId, Guid requestingUserId, bool isAdmin)
     // ============================================
     public async Task CancelBookingAsync(Guid bookingId, Guid requestingUserId, bool isAdmin)
     {
@@ -98,7 +98,7 @@ public class BookingManager : IBookingService
         if (booking.UserId != requestingUserId && !isAdmin)
             throw new ForbiddenOperationException("Нет прав на отмену этой брони");
 
-        // Проверка: событие ещё не началось
+        // Событие ещё не началось?
         var eventDto = await _eventServiceClient.GetEventAsync(booking.EventId);
         if (eventDto != null && eventDto.StartAt <= DateTime.UtcNow)
             throw new EventAlreadyStartedException(
@@ -117,19 +117,22 @@ public class BookingManager : IBookingService
     }
 
     // ============================================
-    // ✅ ConfirmBookingAsync(Guid)
+    // 4️⃣ ConfirmBookingAsync(Guid bookingId)
     // ============================================
     public async Task ConfirmBookingAsync(Guid bookingId)
     {
         var booking = await _bookingRepository.GetByIdAsync(bookingId)
             ?? throw new NotFoundException($"Бронь с id {bookingId} не найдена");
 
-        booking.Confirm();
+        if (booking.Status != BookingStatus.Pending)
+            throw new ForbiddenOperationException(
+                "Подтвердить можно только бронь в статусе Pending");
 
-        // 1. Сначала сохраняем в свою БД
+        // 1. Меняем статус и сохраняем в СВОЮ БД
+        booking.Confirm();
         await _bookingRepository.UpdateAsync(booking);
 
-        // 2. Потом публикуем событие в Kafka
+        // 2. И только потом публикуем в Kafka
         var confirmedEvent = new BookingConfirmed(
             BookingId: booking.Id,
             EventId: booking.EventId,

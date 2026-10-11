@@ -20,7 +20,11 @@ public class KafkaEventPublisher : IEventPublisher, IDisposable
 
         var config = new ProducerConfig
         {
-            BootstrapServers = settings.Value.BootstrapServers
+            BootstrapServers = settings.Value.BootstrapServers,
+            // Гарантия доставки: ждём подтверждения от всех реплик
+            Acks = Acks.All,
+            // Идемпотентность продюсера
+            EnableIdempotence = true
         };
 
         _producer = new ProducerBuilder<string, string>(config).Build();
@@ -34,8 +38,8 @@ public class KafkaEventPublisher : IEventPublisher, IDisposable
 
         var message = new Message<string, string>
         {
-            // ✅ Ключ — EventId. Все брони одного события идут в один раздел
-            // и обрабатываются последовательно.
+            // ✅ Ключ — EventId. Все брони по одному событию
+            // попадут в один раздел и обработаются последовательно.
             Key = @event.EventId.ToString(),
             Value = json
         };
@@ -65,7 +69,8 @@ public class KafkaEventPublisher : IEventPublisher, IDisposable
 
     public void Dispose()
     {
-        // ✅ Продюсер — тяжёлый потокобезопасный объект. Освобождаем при остановке приложения.
+        // ✅ Продюсер — тяжёлый потокобезопасный объект.
+        // Даём буферу 5 секунд на отправку оставшихся сообщений.
         _producer?.Flush(TimeSpan.FromSeconds(5));
         _producer?.Dispose();
     }
