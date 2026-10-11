@@ -1,29 +1,35 @@
 ﻿using EventsApi.Application.Interfaces;
 using EventsApi.Application.Settings;
-using EventsApi.Infrastructure.DataAccess;
 using EventsApi.Infrastructure.Repositories;
 using EventsApi.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using UserService.Application.Interfaces;
+using UserService.Application.Settings;
+using UserService.Infrastructure.DataAccess;
+using UserService.Infrastructure.Repositories;
+using UserService.Infrastructure.Security;
 
-namespace EventsApi.Infrastructure;
+namespace UserService.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructureServices(
+    public static IServiceCollection AddUserInfrastructureServices(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddDbContext<AppDbContext>(options =>
+        // DbContext
+        services.AddDbContext<UserDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-        services.AddScoped<IEventRepository, EventRepository>();
-        services.AddScoped<IBookingRepository, BookingRepository>();
-        services.AddScoped<IUserRepository, UserRepository>();
-
+        // JWT-настройки
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
 
+        // Репозитории
+        services.AddScoped<IUserRepository, UserRepository>();
+
+        // Компоненты безопасности
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
 

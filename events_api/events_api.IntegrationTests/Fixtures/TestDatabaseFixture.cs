@@ -1,47 +1,54 @@
-﻿using EventsApi.Infrastructure;
+﻿using BookingService.Infrastructure.DataAccess;
+using EventService.Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
+using UserService.Infrastructure.DataAccess;
 using Xunit;
-using EventsApi.Infrastructure.DataAccess;
 
-namespace EventsApi.IntegrationTests.Fixtures;
+namespace IntegrationTests.Fixtures;
 
 public class TestDatabaseFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgresContainer;
-    public AppDbContext DbContext { get; private set; } = null!;
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
+        .WithImage("postgres:16-alpine")
+        .WithDatabase("test_db")
+        .WithUsername("postgres")
+        .WithPassword("postgres")
+        .Build();
 
-    public TestDatabaseFixture()
-    {
-        _postgresContainer = new PostgreSqlBuilder().WithImage("postgres:16-alpine")
-            .WithImage("postgres:16-alpine")
-            .WithDatabase("events_test")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-    }
+    public UserDbContext UserContext { get; private set; } = null!;
+    public EventDbContext EventContext { get; private set; } = null!;
+    public BookingDbContext BookingContext { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        await _postgresContainer.StartAsync();
+        await _postgres.StartAsync();
+        var connStr = _postgres.GetConnectionString();
 
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(_postgresContainer.GetConnectionString())
-            .Options;
+        UserContext = new UserDbContext(
+            new DbContextOptionsBuilder<UserDbContext>().UseNpgsql(connStr).Options);
 
-        DbContext = new AppDbContext(options);
+        EventContext = new EventDbContext(
+            new DbContextOptionsBuilder<EventDbContext>().UseNpgsql(connStr).Options);
+
+        BookingContext = new BookingDbContext(
+            new DbContextOptionsBuilder<BookingDbContext>().UseNpgsql(connStr).Options);
     }
 
     public async Task DisposeAsync()
     {
-        await DbContext.DisposeAsync();
-        await _postgresContainer.DisposeAsync();
+        await UserContext.DisposeAsync();
+        await EventContext.DisposeAsync();
+        await BookingContext.DisposeAsync();
+        await _postgres.DisposeAsync();
     }
 
-    public async Task ResetDatabaseAsync()
+    public async Task ResetAsync()
     {
-        // Удаляем и пересоздаём схему
-        await DbContext.Database.EnsureDeletedAsync();
-        await DbContext.Database.MigrateAsync();
+        // Удаляем всю схему и накатываем миграции заново
+        await UserContext.Database.EnsureDeletedAsync();
+        await UserContext.Database.MigrateAsync();
+        await EventContext.Database.MigrateAsync();
+        await BookingContext.Database.MigrateAsync();
     }
 }
