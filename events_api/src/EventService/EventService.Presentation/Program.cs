@@ -22,6 +22,9 @@ builder.Services.AddControllers();
 builder.Services.AddEventApplicationServices();
 builder.Services.AddEventInfrastructureServices(builder.Configuration);
 
+//  инициализатор топика
+builder.Services.AddHostedService<KafkaTopicInitializer>();
+
 // ✅ Фоновый подписчик на Kafka
 builder.Services.AddHostedService<BookingConfirmedConsumer>();
 

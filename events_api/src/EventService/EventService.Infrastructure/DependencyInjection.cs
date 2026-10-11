@@ -19,7 +19,7 @@ public static class DependencyInjection
 
         services.AddScoped<IEventRepository, EventRepository>();
 
-        // Kafka
+        // Kafka: конфигурация (ConsumerGroup + BootstrapServers)
         services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
 
         return services;

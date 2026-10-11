@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 using Confluent.Kafka;
-using EventService.Infrastructure.DataAccess;   // ← для EventDbContext
+using EventService.Infrastructure.DataAccess;
 using EventsApi.Contracts.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +10,10 @@ using Microsoft.Extensions.Options;
 
 namespace EventService.Infrastructure.Kafka;
 
+/// <summary>
+/// Фоновый подписчик на топик booking-confirmed.
+/// При получении сообщения уменьшает AvailableSeats у события.
+/// </summary>
 public class BookingConfirmedConsumer : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
@@ -47,12 +51,15 @@ public class BookingConfirmedConsumer : BackgroundService
             {
                 try
                 {
+                    // Consume — блокирующий метод, но уважает CancellationToken.
+                    // Возвращает null по таймауту.
                     var result = consumer.Consume(stoppingToken);
                     if (result?.Message?.Value == null)
                         continue;
 
                     await HandleMessageAsync(result.Message.Value, stoppingToken);
 
+                    // Offset коммитим только после успешной обработки.
                     consumer.Commit(result);
                 }
                 catch (ConsumeException ex)
@@ -65,6 +72,7 @@ public class BookingConfirmedConsumer : BackgroundService
                 }
                 catch (Exception ex)
                 {
+                    // НЕ валим сервис на одном «плохом» сообщении.
                     _logger.LogError(ex, "Ошибка обработки сообщения — пропускаем");
                 }
             }
@@ -81,7 +89,8 @@ public class BookingConfirmedConsumer : BackgroundService
         BookingConfirmed? booking;
         try
         {
-            booking = JsonSerializer.Deserialize<BookingConfirmed>(json, KafkaJsonOptions.Default);
+            booking = JsonSerializer.Deserialize<BookingConfirmed>(
+                json, KafkaJsonOptions.Default);
         }
         catch (JsonException ex)
         {
@@ -95,6 +104,8 @@ public class BookingConfirmedConsumer : BackgroundService
             return;
         }
 
+        // ✅ BackgroundService — singleton, DbContext — scoped.
+        // Создаём scope для каждого сообщения.
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EventDbContext>();
 
