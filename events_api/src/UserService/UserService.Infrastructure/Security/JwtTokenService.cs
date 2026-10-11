@@ -1,11 +1,11 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using UserService.Application.Interfaces;
 using UserService.Application.Settings;
 using UserService.Domain.Enums;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 
 namespace UserService.Infrastructure.Security;
 
@@ -24,7 +24,7 @@ public class JwtTokenService : ITokenService
         {
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new(JwtRegisteredClaimNames.UniqueName, login),
-            new(ClaimTypes.Role, role.ToString()),
+            new("role", role.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

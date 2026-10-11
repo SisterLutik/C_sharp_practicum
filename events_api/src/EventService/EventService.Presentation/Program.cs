@@ -22,10 +22,8 @@ builder.Services.AddControllers();
 builder.Services.AddEventApplicationServices();
 builder.Services.AddEventInfrastructureServices(builder.Configuration);
 
-//  инициализатор топика
+//  HostedService
 builder.Services.AddHostedService<KafkaTopicInitializer>();
-
-// ✅ Фоновый подписчик на Kafka
 builder.Services.AddHostedService<BookingConfirmedConsumer>();
 
 // ============================================
@@ -46,7 +44,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSection["Issuer"],
             ValidAudience = jwtSection["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            RoleClaimType = "role"
         };
     });
 
