@@ -54,7 +54,7 @@ services:
   # ============================================
   user-service:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
       args:
         PROJECT: src/UserService/UserService.Presentation/UserService.Presentation.csproj
@@ -77,7 +77,7 @@ services:
   # ============================================
   event-service:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
       args:
         PROJECT: src/EventService/EventService.Presentation/EventService.Presentation.csproj
@@ -104,7 +104,7 @@ services:
   # ============================================
   booking-service:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
       args:
         PROJECT: src/BookingService/BookingService.Presentation/BookingService.Presentation.csproj
