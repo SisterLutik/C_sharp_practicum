@@ -8,9 +8,7 @@ namespace BookingService.Tests.Domain;
 
 public class BookingTests
 {
-    // ============================================
-    // ✅ Создание
-    // ============================================
+    //  Создание
 
     [Fact]
     public void Constructor_WithValidData_ShouldCreatePendingBooking()
@@ -44,9 +42,7 @@ public class BookingTests
         act.Should().Throw<ArgumentException>().WithMessage("*UserId*");
     }
 
-    // ============================================
-    // ✅ Confirm
-    // ============================================
+    //  Confirm
 
     [Fact]
     public void Confirm_FromPending_ShouldSetConfirmed()
@@ -82,9 +78,7 @@ public class BookingTests
         act.Should().Throw<ForbiddenOperationException>();
     }
 
-    // ============================================
-    // ✅ Reject
-    // ============================================
+    //  Reject
 
     [Fact]
     public void Reject_FromPending_ShouldSetRejected()
@@ -108,9 +102,7 @@ public class BookingTests
         act.Should().Throw<ForbiddenOperationException>();
     }
 
-    // ============================================
-    // ✅ Cancel
-    // ============================================
+    //  Cancel
 
     [Fact]
     public void Cancel_FromPending_ShouldSetCancelled()

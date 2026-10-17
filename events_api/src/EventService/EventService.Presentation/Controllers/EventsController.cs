@@ -49,7 +49,7 @@ public class EventsController : ControllerBase
         return Ok(ToResponse(eventItem));
     }
 
-    // 🔒 Admin-only
+    // Admin-only
     [HttpPost]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
@@ -59,7 +59,7 @@ public class EventsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, ToResponse(newEvent));
     }
 
-    // 🔒 Admin-only
+    // Admin-only
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
@@ -69,41 +69,12 @@ public class EventsController : ControllerBase
         return Ok(ToResponse(updated));
     }
 
-    // 🔒 Admin-only
+    // Admin-only
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _eventService.DeleteAsync(id);
-        return NoContent();
-    }
-
-    // 🔗 Межсервисные — внутренние, без [Authorize]
-    // (в продакшене защищаются service-to-service токеном или сетью)
-    [HttpPost("{id}/reserve")]
-    public async Task<IActionResult> ReserveSeats(Guid id)
-    {
-        var result = await _eventService.TryReserveSeatsAsync(id);
-
-        if (!result.Success && result.Reason == "Event not found")
-            throw new NotFoundException($"Событие с id {id} не найдено");
-
-        if (!result.Success)
-            return Conflict(new
-            {
-                Message = result.Reason ?? "No available seats for this event",
-                AvailableSeats = result.AvailableSeats
-            });
-
-        return Ok(result);
-    }
-
-    [HttpPost("{id}/release")]
-    public async Task<IActionResult> ReleaseSeats(Guid id)
-    {
-        var success = await _eventService.ReleaseSeatsAsync(id);
-        if (!success)
-            throw new NotFoundException($"Событие с id {id} не найдено");
         return NoContent();
     }
 

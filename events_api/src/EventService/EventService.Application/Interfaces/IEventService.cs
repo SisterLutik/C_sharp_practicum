@@ -11,6 +11,4 @@ public interface IEventService
     Task<Event> CreateEventAsync(string title, string? description, DateTime startAt, DateTime endAt, int totalSeats);
     Task<Event> UpdateAsync(Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats);
     Task DeleteAsync(Guid id);
-    Task<ReserveSeatsResponse> TryReserveSeatsAsync(Guid eventId);
-    Task<bool> ReleaseSeatsAsync(Guid eventId);
-}
+ }

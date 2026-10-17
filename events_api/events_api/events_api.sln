@@ -57,6 +57,19 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventService.Tests", "..\..
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.Tests", "..\..\events_api.Tests\UserService.Tests\UserService.Tests.csproj", "{9B930B18-5438-86FC-4CAA-F2DF31CD299F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Элементы решения", "Элементы решения", "{5080389B-05B6-4541-87BE-8337D0C2CA3C}"
+	ProjectSection(SolutionItems) = preProject
+		.env = .env
+		.env.example = .env.example
+		docker-compose.yml = docker-compose.yml
+		Dockerfile = Dockerfile
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "init-db", "init-db", "{EB8BDFF3-B71D-47A0-BCBF-A686ADECE78B}"
+	ProjectSection(SolutionItems) = preProject
+		01-create-databases.sql = 01-create-databases.sql
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

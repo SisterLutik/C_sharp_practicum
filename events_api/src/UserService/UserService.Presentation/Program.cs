@@ -53,12 +53,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "User Service API",
-        Version = "v1",
-        Description = "Сервис пользователей: регистрация, вход, выдача JWT"
-    });
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "...", Version = "v1" });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -68,6 +63,11 @@ builder.Services.AddSwaggerGen(options =>
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
         Description = "Введите JWT-токен (без префикса Bearer)"
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = new List<string>()
     });
 });
 

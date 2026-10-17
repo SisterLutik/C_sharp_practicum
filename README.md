@@ -13,39 +13,26 @@ Events API
 
 Система состоит из трёх независимых микросервисов и общего проекта контрактов. Каждый сервис построен по принципам чистой архитектуры (Domain, Application, Infrastructure, Presentation) и имеет свою базу данных.
 
-Схема зависимостей между сервисами:
+Схема зависимостей между сервисами
 
-  UserService  ←  выдаёт JWT-токен
-  
-  EventService  ←  управляет событиями и местами
-  
-  BookingService  →  EventService (HTTP, для резервирования мест)
-  
-  BookingService  →  EventService (Kafka, booking-confirmed)
-  
-  EventService  →  BookingService (HTTP, для проверки событий)
+UserService      →  выдаёт JWT-токен
+EventService     →  управляет событиями и местами
+BookingService   →  управляет бронями, публикует BookingConfirmed в Kafka
+Kafka            →  BookingService публикует, EventService читает
 
-Обмен между сервисами:
+Обмен между сервисами
 
-- HTTP: BookingService вызывает EventService для проверки события и резервирования места.
-- Kafka: BookingService публикует событие BookingConfirmed, EventService его читает и уменьшает доступные места.
-- JWT: токен выдаёт только UserService, остальные сервисы его проверяют.
+- Kafka: BookingService публикует BookingConfirmed при подтверждении брони. EventService читает сообщение и уменьшает AvailableSeats у события.
+- JWT: токен выдаёт только UserService, остальные сервисы проверяют его по общему секрету.
+- Прямого HTTP-взаимодействия между сервисами нет.
 
 Структура решения
 
-events_api/
-├── events_api.sln
-├── docker-compose.yml
-├── Dockerfile
-├── .env.example
-├── .env                         (не в git)
-├── init-db/
-│   └── 01-create-databases.sql
+events_api/                              корень репозитория
+├── events_api.sln                       файл решения
 ├── src/
-│   ├── EventsApi.Contracts/    общий проект контрактов
-│   │   ├── Events/
-│   │   ├── Users/
-│   │   └── Kafka/              BookingConfirmed, KafkaTopics, KafkaJsonOptions
+│   ├── EventsApi.Contracts/            общий проект контрактов
+│   │   └── Kafka/                      BookingConfirmed, KafkaTopics, KafkaJsonOptions
 │   │
 │   ├── UserService/
 │   │   ├── UserService.Domain/
@@ -64,21 +51,30 @@ events_api/
 │       ├── BookingService.Application/
 │       ├── BookingService.Infrastructure/
 │       └── BookingService.Presentation/
-└── tests/
-    ├── UserService.Tests/
-    ├── EventService.Tests/
-    ├── BookingService.Tests/
-    └── IntegrationTests/
+│
+├── tests/
+│   ├── UserService.Tests/
+│   ├── EventService.Tests/
+│   ├── BookingService.Tests/
+│   └── IntegrationTests/
+│
+└── events_api/                          Docker-инфраструктура
+    ├── docker-compose.yml
+    ├── Dockerfile
+    ├── .env.example
+    ├── .env                             (не в git)
+    └── init-db/
+        └── 01-create-databases.sql
 
 Назначение слоёв
 
-Domain — доменные сущности (User, Event, Booking), перечисления (UserRole, BookingStatus), доменные исключения. Не зависит ни от чего внешнего.
+- Domain — доменные сущности (User, Event, Booking), перечисления (UserRole, BookingStatus), доменные исключения. Не зависит ни от чего внешнего.
 
-Application — бизнес-логика, интерфейсы сервисов и портов (IUserRepository, IEventServiceClient, IEventPublisher), DTO. Зависит только от Domain.
+- Application — бизнес-логика, интерфейсы сервисов и портов (IUserRepository, IEventPublisher, IBookingRepository), DTO. Зависит только от Domain.
 
-Infrastructure — реализации портов: репозитории, DbContext, миграции, HTTP-клиенты, Kafka-продюсеры и консьюмеры, компоненты безопасности. Зависит от Application и Domain.
+- Infrastructure — реализации портов: репозитории, DbContext, миграции, Kafka-продюсеры и консьюмеры, компоненты безопасности. Зависит от Application и Domain.
 
-Presentation — контроллеры, middleware, Program.cs, фоновые сервисы. Зависит от Application и Infrastructure.
+- Presentation — контроллеры, middleware, Program.cs, фоновые сервисы. Зависит от Application и Infrastructure.
 
 Роли и доступ
 
@@ -90,67 +86,69 @@ UserRole имеет два значения:
 Права по эндпоинтам
 
 UserService:
-
 - POST /api/auth/register — доступен без токена
 - POST /api/auth/login — доступен без токена
 
 EventService:
-
 - GET /api/events — публичный
 - GET /api/events/{id} — публичный
 - POST /api/events — только Admin
 - PUT /api/events/{id} — только Admin
 - DELETE /api/events/{id} — только Admin
-- POST /api/events/{id}/reserve — внутренний, вызывается BookingService
-- POST /api/events/{id}/release — внутренний, вызывается BookingService
 
 BookingService:
-
 - GET /api/bookings/{id} — требуется аутентификация
 - POST /api/bookings/events/{eventId} — требуется аутентификация
 - DELETE /api/bookings/{id} — требуется аутентификация, владелец или Admin
 
 Доменные правила
 
-- Нельзя забронировать событие, которое уже началось (возвращается 400)
 - Максимум 10 активных броней у одного пользователя (возвращается 409)
 - Нельзя отменить чужую бронь без прав Admin (возвращается 403)
 - Нельзя отменить уже отменённую бронь (возвращается 409)
-- Нельзя забронировать при отсутствии мест (возвращается 409)
+
+Проверка «событие существует / не началось / есть места» выполняется в EventService при получении BookingConfirmed из Kafka. Если проверка не проходит — места не уменьшаются, а в лог пишется предупреждение. Пользователь узнаёт об этом, когда бронь не подтвердилась.
 
 Запуск через Docker
 
 Это основной способ запуска — одной командой поднимается вся система.
 
-1. Скопируйте шаблон секретов:
+Docker-файлы находятся в папке events_api/events_api/.
+
+1. Перейдите в папку с Docker-файлами:
+
+cd events_api
+
+2. Скопируйте шаблон секретов:
 
 cp .env.example .env
 
-2. Отредактируйте .env, установив уникальный JWT_SECRET (не короче 32 символов).
+3. Отредактируйте .env, установив уникальный JWT_SECRET (не короче 32 символов).
 
-3. Запустите:
+4. Запустите:
 
 docker compose up --build
 
-4. Проверьте, что все контейнеры поднялись:
+5. Проверьте, что все контейнеры поднялись:
 
 docker compose ps
 
-5. Откройте Swagger UI:
+6. Откройте Swagger UI:
 
-http://localhost:5001/swagger — UserService
-http://localhost:5002/swagger — EventService
-http://localhost:5003/swagger — BookingService
+- http://localhost:5001/swagger — UserService
+- http://localhost:5002/swagger — EventService
+- http://localhost:5003/swagger — BookingService
 
 Схема портов
 
 Docker внутренний порт — 8080 для всех сервисов. На хост маппятся:
 
-- 5001 → UserService
-- 5002 → EventService
-- 5003 → BookingService
-- 5432 → PostgreSQL (один инстанс, три базы)
-- 9093 → Kafka (внешний listener для подключения с хоста)
+Порт на хосте | Сервис
+5001 | UserService
+5002 | EventService
+5003 | BookingService
+5432 | PostgreSQL (один инстанс, три базы)
+9093 | Kafka (внешний listener для подключения с хоста)
 
 Остановка:
 
@@ -161,8 +159,6 @@ docker compose down
 docker compose down -v
 
 Запуск без Docker
-
-Если хотите запустить сервисы локально:
 
 1. Установите PostgreSQL и Kafka.
 
@@ -188,7 +184,7 @@ dotnet user-secrets set "Jwt:Secret" "super-secret-key-minimum-32-characters-lon
 
 Секрет должен быть одинаковым во всех трёх сервисах.
 
-4. Запустите каждый сервис в отдельном терминале:
+4. Запустите каждый сервис в отдельном терминале из корня репозитория:
 
 dotnet run --project src/UserService/UserService.Presentation
 dotnet run --project src/EventService/EventService.Presentation
@@ -200,9 +196,9 @@ dotnet run --project src/BookingService/BookingService.Presentation
 
 Параметры JWT хранятся в appsettings.json в секции Jwt:
 
-  Issuer — EventsApi
-  Audience — EventsApiClients
-  ExpiresInMinutes — 60
+- Issuer — EventsApi
+- Audience — EventsApiClients
+- ExpiresInMinutes — 60
 
 Сам секрет (Secret) в appsettings.json НЕ хранится. Он передаётся:
 
@@ -235,9 +231,10 @@ docker exec events-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-se
 
 Каждый сервис имеет свою базу:
 
-- users_db — таблица Users
-- events_db — таблица Events
-- bookings_db — таблица Bookings
+Сервис | База
+UserService | users_db (таблица Users)
+EventService | events_db (таблицы Events, ProcessedBookings)
+BookingService | bookings_db (таблица Bookings)
 
 Базы физически живут в одном инстансе PostgreSQL, но логически изолированы. Между таблицами разных сервисов нет внешних ключей — связь только по идентификаторам (UserId, EventId).
 
@@ -245,7 +242,7 @@ docker exec events-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-se
 
 Схема управляется через EF Core миграции. Миграции применяются автоматически при старте каждого сервиса.
 
-Создание новой миграции для конкретного сервиса:
+Создание новой миграции для конкретного сервиса (из корня репозитория):
 
 dotnet ef migrations add ИмяМиграции --project src/UserService/UserService.Infrastructure --startup-project src/UserService/UserService.Presentation
 
@@ -258,11 +255,8 @@ BookingService содержит фоновый сервис BookingBackgroundSer
 Логика обработки:
 
 1. Задержка 2 секунды (имитация обращения к внешней системе)
-2. Проверка, что событие существует через EventService (HTTP)
-3. Если событие не найдено — бронь переводится в Rejected
-4. Если событие найдено — бронь переводится в Confirmed
-5. Событие сохраняется в БД BookingService
-6. В Kafka публикуется BookingConfirmed
+2. Бронь переводится в статус Confirmed и сохраняется в bookings_db
+3. В Kafka публикуется BookingConfirmed
 
 EventService читает BookingConfirmed и уменьшает AvailableSeats у соответствующего события в events_db.
 
@@ -271,10 +265,22 @@ EventService читает BookingConfirmed и уменьшает AvailableSeats 
 Это ключевая часть системы. Поток данных:
 
 1. Пользователь создаёт бронь: POST /api/bookings/events/{eventId}
-2. BookingService резервирует место через HTTP POST к EventService /reserve
-3. Через 5-7 секунд фоновая служба подтверждает бронь и публикует BookingConfirmed в Kafka
-4. EventService получает сообщение и уменьшает AvailableSeats в своей БД
-5. Если Kafka недоступна, сообщение останется в топике и будет доставлено при перезапуске
+   → BookingService сохраняет Booking со статусом Pending.
+   Места в EventService пока НЕ уменьшаются.
+
+2. Фоновая служба BookingBackgroundService каждые 5 секунд ищет брони в статусе Pending и передаёт их в BookingProcessor.
+
+3. BookingProcessor после задержки (2 секунды, имитация внешней системы) вызывает BookingManager.ConfirmBookingAsync:
+   - меняет статус на Confirmed и сохраняет в bookings_db;
+   - публикует BookingConfirmed в Kafka.
+
+4. EventService.BookingConfirmedConsumer читает сообщение и:
+   - проверяет, не обрабатывалась ли эта бронь раньше (идемпотентность);
+   - проверяет, что событие существует и ещё не началось;
+   - уменьшает AvailableSeats на 1 и сохраняет в events_db;
+   - записывает отметку в ProcessedBookings.
+
+5. Если Kafka недоступна, сообщение останется в топике и будет доставлено при перезапуске.
 
 Преимущества такой схемы:
 
@@ -282,13 +288,23 @@ EventService читает BookingConfirmed и уменьшает AvailableSeats 
 - Kafka гарантирует at-least-once доставку
 - При сбое одного сервиса второй продолжает работать
 
+Идемпотентность
+
+Kafka гарантирует доставку at-least-once — одно сообщение может прийти дважды (например, если EventService упал между SaveChangesAsync и Commit).
+
+Чтобы не уменьшить места дважды, EventService хранит обработанные BookingId в таблице ProcessedBookings. Первичный ключ — BookingId, поэтому повторная вставка невозможна. При повторной доставке consumer:
+
+1. Проверяет, есть ли BookingId в ProcessedBookings
+2. Если есть — пропускает сообщение с записью в лог
+
 Формат сообщения BookingConfirmed
 
-  bookingId — Guid брони
-  eventId — Guid события
-  userId — Guid пользователя
-  seatsCount — количество мест (обычно 1)
-  confirmedAt — момент подтверждения (UTC)
+Поле | Тип | Описание
+bookingId | Guid | Идентификатор брони
+eventId | Guid | Идентификатор события
+userId | Guid | Идентификатор пользователя
+seatsCount | int | Количество мест (обычно 1)
+confirmedAt | DateTime | Момент подтверждения (UTC)
 
 Пример:
 
@@ -304,8 +320,8 @@ EventService читает BookingConfirmed и уменьшает AvailableSeats 
 
 Шаг 1. Логин администратора. При первом запуске UserService автоматически создаёт админа:
 
-  Логин: admin
-  Пароль: admin123
+- Логин: admin
+- Пароль: admin123
 
 POST http://localhost:5001/api/auth/login
 Content-Type: application/json
@@ -410,16 +426,17 @@ UserRole
 
 Коды ответов
 
-- 200 — успешно
-- 201 — создано
-- 202 — принято в обработку
-- 204 — удалено
-- 400 — ошибка валидации или событие уже началось
-- 401 — не аутентифицирован
-- 403 — нет прав на операцию
-- 404 — ресурс не найден
-- 409 — конфликт (нет мест, лимит броней, повторная отмена)
-- 500 — внутренняя ошибка
+Код | Описание
+200 | Успешно
+201 | Создано
+202 | Принято в обработку
+204 | Удалено
+400 | Ошибка валидации или событие уже началось
+401 | Не аутентифицирован
+403 | Нет прав на операцию
+404 | Ресурс не найден
+409 | Конфликт (нет мест, лимит броней, повторная отмена)
+500 | Внутренняя ошибка
 
 Безопасность
 
@@ -444,13 +461,17 @@ UserRole
 
 Полезные команды
 
-Сборка решения:
+Сборка решения (из корня репозитория):
 
 dotnet build
 
 Очистка:
 
 dotnet clean
+
+Переход в папку Docker-файлов:
+
+cd events_api
 
 Просмотр логов конкретного сервиса:
 

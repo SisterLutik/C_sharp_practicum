@@ -1,6 +1,5 @@
 ﻿using BookingService.Application.Interfaces;
 using BookingService.Infrastructure.DataAccess;
-using BookingService.Infrastructure.HttpClients;
 using BookingService.Infrastructure.Kafka;
 using BookingService.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -20,11 +19,6 @@ public static class DependencyInjection
 
         services.AddScoped<IBookingRepository, BookingRepository>();
 
-        services.AddHttpClient<IEventServiceClient, EventServiceClient>(client =>
-        {
-            client.BaseAddress = new Uri(configuration["Services:EventService:BaseUrl"]!);
-            client.Timeout = TimeSpan.FromSeconds(30);
-        });
 
         //  Kafka
         services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));

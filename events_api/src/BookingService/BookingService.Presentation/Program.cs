@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Text;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================
@@ -52,12 +53,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Booking Service API",
-        Version = "v1",
-        Description = "Сервис броней: создание, отмена, фоновая обработка"
-    });
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "...", Version = "v1" });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -67,6 +63,11 @@ builder.Services.AddSwaggerGen(options =>
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
         Description = "Введите JWT-токен (без префикса Bearer)"
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = new List<string>()
     });
 });
 

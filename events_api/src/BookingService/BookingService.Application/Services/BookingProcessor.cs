@@ -6,20 +6,19 @@ namespace BookingService.Application.Services;
 
 public class BookingProcessor : IBookingProcessor
 {
+    private const int ExternalCallDelayMs = 2000;
+
     private readonly IBookingService _bookingService;
     private readonly IBookingRepository _bookingRepository;
-    private readonly IEventServiceClient _eventServiceClient;
     private readonly ILogger<BookingProcessor> _logger;
 
     public BookingProcessor(
         IBookingService bookingService,
         IBookingRepository bookingRepository,
-        IEventServiceClient eventServiceClient,
         ILogger<BookingProcessor> logger)
     {
         _bookingService = bookingService;
         _bookingRepository = bookingRepository;
-        _eventServiceClient = eventServiceClient;
         _logger = logger;
     }
 
@@ -27,8 +26,8 @@ public class BookingProcessor : IBookingProcessor
     {
         try
         {
-            // Имитация обращения к внешней системе
-            await Task.Delay(2000, stoppingToken);
+            // Имитация внешней системы — вынесено в константу
+            await Task.Delay(ExternalCallDelayMs, stoppingToken);
 
             var booking = await _bookingRepository.GetByIdAsync(bookingId);
             if (booking == null || booking.Status != BookingStatus.Pending)
@@ -38,17 +37,6 @@ public class BookingProcessor : IBookingProcessor
                 return;
             }
 
-            var eventDto = await _eventServiceClient.GetEventAsync(booking.EventId);
-            if (eventDto == null)
-            {
-                booking.Reject();
-                await _bookingRepository.UpdateAsync(booking);
-                _logger.LogWarning(
-                    "Бронь {BookingId} отклонена: событие не найдено", bookingId);
-                return;
-            }
-
-            //  Подтверждаем бронь + публикуем в Kafka
             await _bookingService.ConfirmBookingAsync(bookingId);
 
             _logger.LogInformation("Бронь {BookingId} подтверждена", bookingId);

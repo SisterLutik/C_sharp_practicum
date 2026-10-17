@@ -2,6 +2,7 @@
 using Confluent.Kafka;
 using EventService.Infrastructure.DataAccess;
 using EventsApi.Contracts.Kafka;
+using EventService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -89,8 +90,7 @@ public class BookingConfirmedConsumer : BackgroundService
         BookingConfirmed? booking;
         try
         {
-            booking = JsonSerializer.Deserialize<BookingConfirmed>(
-                json, KafkaJsonOptions.Default);
+            booking = JsonSerializer.Deserialize<BookingConfirmed>(json, KafkaJsonOptions.Default);
         }
         catch (JsonException ex)
         {
@@ -98,16 +98,19 @@ public class BookingConfirmedConsumer : BackgroundService
             return;
         }
 
-        if (booking == null)
-        {
-            _logger.LogWarning("Пустое сообщение — пропускаем");
-            return;
-        }
+        if (booking == null) return;
 
-        // ✅ BackgroundService — singleton, DbContext — scoped.
-        // Создаём scope для каждого сообщения.
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EventDbContext>();
+        var alreadyProcessed = await context.ProcessedBookings
+            .AnyAsync(p => p.BookingId == booking.BookingId, stoppingToken);
+
+        if (alreadyProcessed)
+        {
+            _logger.LogInformation(
+                "Бронь {BookingId} уже обработана — пропускаем", booking.BookingId);
+            return;
+        }
 
         var eventEntity = await context.Events
             .FirstOrDefaultAsync(e => e.Id == booking.EventId, stoppingToken);
@@ -120,6 +123,15 @@ public class BookingConfirmedConsumer : BackgroundService
             return;
         }
 
+        // Проверка: событие ещё не началось
+        if (eventEntity.HasStarted())
+        {
+            _logger.LogWarning(
+                "Событие {EventId} уже началось. Бронь {BookingId} — пропускаем",
+                booking.EventId, booking.BookingId);
+            return;
+        }
+
         if (!eventEntity.TryReserveSeats(booking.SeatsCount))
         {
             _logger.LogWarning(
@@ -127,6 +139,9 @@ public class BookingConfirmedConsumer : BackgroundService
                 booking.EventId, booking.BookingId);
             return;
         }
+
+        // Записываем в обработанные
+        context.ProcessedBookings.Add(new ProcessedBooking(booking.BookingId));
 
         await context.SaveChangesAsync(stoppingToken);
 
