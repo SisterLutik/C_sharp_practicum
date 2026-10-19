@@ -5,6 +5,8 @@ using EventService.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
+
 
 namespace EventService.Infrastructure;
 
@@ -19,9 +21,24 @@ public static class DependencyInjection
 
         services.AddScoped<IEventRepository, EventRepository>();
 
-        // Kafka: конфигурация (ConsumerGroup + BootstrapServers)
         services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
 
+        services.Configure<RedisSettings>(configuration.GetSection(RedisSettings.SectionName));
+
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+        {
+            var settings = configuration
+                .GetSection(RedisSettings.SectionName)
+                .Get<RedisSettings>()
+                ?? throw new InvalidOperationException(
+                    "Секция Redis не найдена в конфигурации");
+
+            return ConnectionMultiplexer.Connect(settings.ConnectionString);
+        });
+
+        services.AddScoped<ICacheService, RedisCacheService>();
+
         return services;
+
     }
 }

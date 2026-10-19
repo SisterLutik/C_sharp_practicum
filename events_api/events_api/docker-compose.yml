@@ -7,7 +7,6 @@ services:
     container_name: events-kafka
     hostname: kafka
     ports:
-      - "9092:9092"
       - "9093:9093"
     environment:
       KAFKA_NODE_ID: 1
@@ -27,7 +26,8 @@ services:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 10s
       timeout: 10s
-      retries: 10
+      retries: 15
+      start_period: 30s
 
   # ============================================
   # PostgreSQL — один инстанс, три базы
@@ -50,12 +50,26 @@ services:
       retries: 10
 
   # ============================================
+  # Redis — кэш для EventService
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: events-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ============================================
   # UserService
   # ============================================
   user-service:
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: events_api/Dockerfile
       args:
         PROJECT: src/UserService/UserService.Presentation/UserService.Presentation.csproj
     container_name: events-user-service
@@ -78,7 +92,7 @@ services:
   event-service:
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: events_api/Dockerfile
       args:
         PROJECT: src/EventService/EventService.Presentation/EventService.Presentation.csproj
     container_name: events-event-service
@@ -90,13 +104,18 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Kafka__BootstrapServers: ${KAFKA_BOOTSTRAP_SERVERS}
+      Kafka__BootstrapServers: kafka:9092
       Kafka__ConsumerGroup: event-service
+      Redis__ConnectionString: "redis:6379"
+      Redis__InstanceName: "events:"
+      Redis__DefaultExpirationMinutes: 5
     entrypoint: ["dotnet", "EventService.Presentation.dll"]
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # ============================================
@@ -105,7 +124,7 @@ services:
   booking-service:
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: events_api/Dockerfile
       args:
         PROJECT: src/BookingService/BookingService.Presentation/BookingService.Presentation.csproj
     container_name: events-booking-service
@@ -117,16 +136,13 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
-      Kafka__BootstrapServers: ${KAFKA_BOOTSTRAP_SERVERS}
-      Services__EventService__BaseUrl: "http://event-service:8080"
+      Kafka__BootstrapServers: kafka:9092
     entrypoint: ["dotnet", "BookingService.Presentation.dll"]
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      event-service:
-        condition: service_started
 
 volumes:
   postgres-data:
