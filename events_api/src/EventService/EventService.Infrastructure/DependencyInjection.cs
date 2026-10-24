@@ -2,6 +2,7 @@
 using EventService.Infrastructure.DataAccess;
 using EventService.Infrastructure.Kafka;
 using EventService.Infrastructure.Repositories;
+using EventService.Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
