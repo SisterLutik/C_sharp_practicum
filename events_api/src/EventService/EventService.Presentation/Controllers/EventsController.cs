@@ -1,9 +1,7 @@
 using EventService.Application.DTOs;
 using EventService.Application.Interfaces;
-using EventService.Domain.Entities;
 using EventService.Domain.Exceptions;
-using EventsApi.Contracts.Events;
-using Microsoft.AspNetCore.Authorization;   // ← для [Authorize]
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventService.Presentation.Controllers;
@@ -19,8 +17,18 @@ public class EventsController : ControllerBase
         _eventService = eventService;
     }
 
-    // Публичный
+    // GET /api/events/top — топ-10 по продажам
+    [HttpGet("top")]
+    [ProducesResponseType(typeof(List<EventResponse>), 200)]
+    public async Task<IActionResult> GetTop()
+    {
+        var result = await _eventService.GetTopEventsAsync(10);
+        return Ok(result);
+    }
+
+    // GET /api/events
     [HttpGet]
+    [ProducesResponseType(typeof(PaginatedResult<EventResponse>), 200)]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? title,
         [FromQuery] DateTime? from,
@@ -29,6 +37,7 @@ public class EventsController : ControllerBase
         [FromQuery] int pageSize = 10)
     {
         var result = await _eventService.GetAllAsync(title, from, to, page, pageSize);
+
         return Ok(new
         {
             result.Page,
@@ -39,46 +48,22 @@ public class EventsController : ControllerBase
         });
     }
 
-    // Публичный
+    // GET /api/events/{id} — Cache-Aside
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(EventResponse), 200)]
+    [ProducesResponseType(404)]
     public async Task<IActionResult> GetById(Guid id)
     {
         var eventItem = await _eventService.GetByIdAsync(id);
         if (eventItem == null)
             throw new NotFoundException($"Событие с id {id} не найдено");
-        return Ok(ToResponse(eventItem));
+
+        return Ok(eventItem);   // ← уже EventResponse, не нужно мапить
     }
 
-    // Admin-only
-    [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
-    {
-        var newEvent = await _eventService.CreateEventAsync(
-            request.Title, request.Description, request.StartAt, request.EndAt, request.TotalSeats);
-        return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, ToResponse(newEvent));
-    }
+    // ... Create, Update, Delete, Reserve, Release — как раньше
 
-    // Admin-only
-    [HttpPut("{id}")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
-    {
-        var updated = await _eventService.UpdateAsync(
-            id, request.Title, request.Description, request.StartAt, request.EndAt, request.TotalSeats);
-        return Ok(ToResponse(updated));
-    }
-
-    // Admin-only
-    [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Delete(Guid id)
-    {
-        await _eventService.DeleteAsync(id);
-        return NoContent();
-    }
-
-    private static EventResponse ToResponse(Event e) => new()
+    private static EventResponse ToResponse(Domain.Entities.Event e) => new()
     {
         Id = e.Id,
         Title = e.Title,

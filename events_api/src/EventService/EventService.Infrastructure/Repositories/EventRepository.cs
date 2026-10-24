@@ -82,4 +82,18 @@ public class EventRepository : IEventRepository
     {
         return await _context.Events.AnyAsync(e => e.Id == id);
     }
+
+    public async Task<List<Event>> GetTopBySalesPercentageAsync(
+    int count,
+    CancellationToken cancellationToken = default)
+    {
+        // Сортировка по проценту проданных мест (по убыванию).
+        // Процент = (TotalSeats - AvailableSeats) / TotalSeats.
+        // EF Core транслирует в SQL ORDER BY.
+        return await _context.Events
+            .OrderByDescending(e =>
+                (double)(e.TotalSeats - e.AvailableSeats) / e.TotalSeats)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
 }
