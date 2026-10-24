@@ -1,12 +1,12 @@
 ﻿using EventService.Application.DTOs;
 using EventService.Application.Interfaces;
 using EventService.Application.Services;
+using EventService.Application.Settings;
 using EventService.Domain.Entities;
 using EventService.Domain.Exceptions;
-using EventService.Application.Settings;
-using Microsoft.Extensions.Options;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -84,10 +84,10 @@ public class EventManagerTests
         await act.Should().ThrowAsync<ValidationException>();
     }
 
-    // Получение по id — Cache-Aside
+    // GetByIdAsync — Cache-Aside
 
     [Fact]
-    public async Task GetByIdAsync_WhenCacheHit_ShouldNotCallRepository()
+    public async Task GetByIdAsync_WhenCacheHit_ShouldReturnFromCacheAndNotCallRepository()
     {
         var eventId = Guid.NewGuid();
         var cachedResponse = new EventResponse
@@ -101,19 +101,32 @@ public class EventManagerTests
         };
 
         _cacheMock
-            .Setup(c => c.GetAsync<EventResponse>($"event:{eventId}", It.IsAny<CancellationToken>()))
+            .Setup(c => c.GetAsync<EventResponse>(
+                $"event:{eventId}",
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(cachedResponse);
 
         var result = await _manager.GetByIdAsync(eventId);
 
         result.Should().NotBeNull();
         result!.Title.Should().Be("Из кеша");
+        result.AvailableSeats.Should().Be(5);
 
-        _repoMock.Verify(r => r.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
+        _repoMock.Verify(
+            r => r.GetByIdAsync(It.IsAny<Guid>()),
+            Times.Never);
+
+        _cacheMock.Verify(
+            c => c.SetAsync(
+                It.IsAny<string>(),
+                It.IsAny<EventResponse>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task GetByIdAsync_WhenCacheMiss_ShouldLoadFromRepositoryAndCache()
+    public async Task GetByIdAsync_WhenCacheMiss_ShouldLoadFromRepositoryAndSetCache()
     {
         var eventId = Guid.NewGuid();
         var eventEntity = new Event(
@@ -123,7 +136,9 @@ public class EventManagerTests
             10);
 
         _cacheMock
-            .Setup(c => c.GetAsync<EventResponse>($"event:{eventId}", It.IsAny<CancellationToken>()))
+            .Setup(c => c.GetAsync<EventResponse>(
+                $"event:{eventId}",
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync((EventResponse?)null);
 
         _repoMock
@@ -136,22 +151,25 @@ public class EventManagerTests
         result!.Title.Should().Be("Из БД");
 
         _repoMock.Verify(r => r.GetByIdAsync(eventId), Times.Once);
+
         _cacheMock.Verify(
             c => c.SetAsync(
                 $"event:{eventId}",
-                It.IsAny<EventResponse>(),
-                It.IsAny<TimeSpan?>(),
+                It.Is<EventResponse>(e => e.Id == eventId && e.Title == "Из БД"),
+                TimeSpan.FromMinutes(5),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
-    public async Task GetByIdAsync_WithNonExistingId_ShouldReturnNull()
+    public async Task GetByIdAsync_WithNonExistingId_ShouldReturnNullAndNotCache()
     {
         var eventId = Guid.NewGuid();
 
         _cacheMock
-            .Setup(c => c.GetAsync<EventResponse>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(c => c.GetAsync<EventResponse>(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync((EventResponse?)null);
 
         _repoMock
@@ -161,6 +179,7 @@ public class EventManagerTests
         var result = await _manager.GetByIdAsync(eventId);
 
         result.Should().BeNull();
+
         _cacheMock.Verify(
             c => c.SetAsync(
                 It.IsAny<string>(),
@@ -170,7 +189,75 @@ public class EventManagerTests
             Times.Never);
     }
 
-    // Обновление
+    // GetTopEventsAsync — Cache-Aside
+
+    [Fact]
+    public async Task GetTopEventsAsync_WhenCacheHit_ShouldReturnFromCacheAndNotCallRepository()
+    {
+        var cached = new List<EventResponse>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Title = "Из кеша",
+                TotalSeats = 10,
+                AvailableSeats = 2
+            }
+        };
+
+        _cacheMock
+            .Setup(c => c.GetAsync<List<EventResponse>>(
+                "events:top10",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(cached);
+
+        var result = await _manager.GetTopEventsAsync(10);
+
+        result.Should().HaveCount(1);
+        result[0].Title.Should().Be("Из кеша");
+
+        _repoMock.Verify(
+            r => r.GetTopBySalesPercentageAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GetTopEventsAsync_WhenCacheMiss_ShouldLoadFromRepositoryAndSetCache()
+    {
+        var events = new List<Event>
+        {
+            new("Популярное", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10)
+        };
+
+        _cacheMock
+            .Setup(c => c.GetAsync<List<EventResponse>>(
+                "events:top10",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<EventResponse>?)null);
+
+        _repoMock
+            .Setup(r => r.GetTopBySalesPercentageAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(events);
+
+        var result = await _manager.GetTopEventsAsync(10);
+
+        result.Should().HaveCount(1);
+        result[0].Title.Should().Be("Популярное");
+
+        _repoMock.Verify(
+            r => r.GetTopBySalesPercentageAsync(10, It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        _cacheMock.Verify(
+            c => c.SetAsync(
+                "events:top10",
+                It.Is<List<EventResponse>>(l => l.Count == 1),
+                TimeSpan.FromMinutes(10),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // UpdateAsync — инвалидация кеша
 
     [Fact]
     public async Task UpdateAsync_WithExistingId_ShouldUpdateEvent()
@@ -203,6 +290,44 @@ public class EventManagerTests
     }
 
     [Fact]
+    public async Task UpdateAsync_ShouldInvalidateCacheAfterDatabaseUpdate()
+    {
+        var eventId = Guid.NewGuid();
+        var existing = new Event(
+            "Старое",
+            DateTime.UtcNow.AddDays(1),
+            DateTime.UtcNow.AddDays(2),
+            10);
+
+        var callOrder = new List<string>();
+
+        _repoMock.Setup(r => r.GetByIdAsync(eventId)).ReturnsAsync(existing);
+        _repoMock
+            .Setup(r => r.UpdateAsync(It.IsAny<Event>()))
+            .Callback(() => callOrder.Add("db"))
+            .Returns(Task.CompletedTask);
+
+        _cacheMock
+            .Setup(c => c.RemoveAsync($"event:{eventId}", It.IsAny<CancellationToken>()))
+            .Callback(() => callOrder.Add("cache"))
+            .Returns(Task.CompletedTask);
+
+        await _manager.UpdateAsync(
+            eventId,
+            "Новое",
+            null,
+            DateTime.UtcNow.AddDays(3),
+            DateTime.UtcNow.AddDays(4),
+            20);
+
+        _cacheMock.Verify(
+            c => c.RemoveAsync($"event:{eventId}", It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        callOrder.Should().ContainInOrder("db", "cache");
+    }
+
+    [Fact]
     public async Task UpdateAsync_WithNonExistingId_ShouldThrowNotFoundException()
     {
         _repoMock
@@ -218,12 +343,16 @@ public class EventManagerTests
             10);
 
         await act.Should().ThrowAsync<NotFoundException>();
+
+        _cacheMock.Verify(
+            c => c.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
-    // Удаление
+    // DeleteAsync — инвалидация кеша
 
     [Fact]
-    public async Task DeleteAsync_WithExistingId_ShouldDelete()
+    public async Task DeleteAsync_WithExistingId_ShouldDeleteAndInvalidateCache()
     {
         var eventId = Guid.NewGuid();
 
@@ -233,6 +362,31 @@ public class EventManagerTests
         await _manager.DeleteAsync(eventId);
 
         _repoMock.Verify(r => r.DeleteAsync(eventId), Times.Once);
+        _cacheMock.Verify(
+            c => c.RemoveAsync($"event:{eventId}", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldInvalidateCacheAfterDatabaseDelete()
+    {
+        var eventId = Guid.NewGuid();
+        var callOrder = new List<string>();
+
+        _repoMock.Setup(r => r.ExistsAsync(eventId)).ReturnsAsync(true);
+        _repoMock
+            .Setup(r => r.DeleteAsync(eventId))
+            .Callback(() => callOrder.Add("db"))
+            .Returns(Task.CompletedTask);
+
+        _cacheMock
+            .Setup(c => c.RemoveAsync($"event:{eventId}", It.IsAny<CancellationToken>()))
+            .Callback(() => callOrder.Add("cache"))
+            .Returns(Task.CompletedTask);
+
+        await _manager.DeleteAsync(eventId);
+
+        callOrder.Should().ContainInOrder("db", "cache");
     }
 
     [Fact]
@@ -245,103 +399,9 @@ public class EventManagerTests
         var act = () => _manager.DeleteAsync(Guid.NewGuid());
 
         await act.Should().ThrowAsync<NotFoundException>();
-    }
 
-    // Топ-10 — Cache-Aside
-
-    [Fact]
-    public async Task GetTopEventsAsync_WhenCacheHit_ShouldNotCallRepository()
-    {
-        var cached = new List<EventResponse>
-        {
-            new() { Id = Guid.NewGuid(), Title = "Из кеша", TotalSeats = 10, AvailableSeats = 2 }
-        };
-
-        _cacheMock
-            .Setup(c => c.GetAsync<List<EventResponse>>("events:top10", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(cached);
-
-        var result = await _manager.GetTopEventsAsync(10);
-
-        result.Should().HaveCount(1);
-        result[0].Title.Should().Be("Из кеша");
-
-        _repoMock.Verify(
-            r => r.GetTopBySalesPercentageAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()),
+        _cacheMock.Verify(
+            c => c.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
-    }
-
-    [Fact]
-    public async Task GetTopEventsAsync_WhenCacheMiss_ShouldLoadFromRepositoryAndCache()
-    {
-        var events = new List<Event>
-        {
-            new("Популярное", DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), 10)
-        };
-
-        _cacheMock
-            .Setup(c => c.GetAsync<List<EventResponse>>("events:top10", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((List<EventResponse>?)null);
-
-        _repoMock
-            .Setup(r => r.GetTopBySalesPercentageAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(events);
-
-        var result = await _manager.GetTopEventsAsync(10);
-
-        result.Should().HaveCount(1);
-        result[0].Title.Should().Be("Популярное");
-
-        _repoMock.Verify(
-            r => r.GetTopBySalesPercentageAsync(10, It.IsAny<CancellationToken>()),
-            Times.Once);
-
-        _cacheMock.Verify(
-            c => c.SetAsync(
-                "events:top10",
-                It.IsAny<List<EventResponse>>(),
-                It.IsAny<TimeSpan?>(),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-    [Fact]
-    public async Task UpdateAsync_ShouldInvalidateCacheAfterDatabaseUpdate()
-    {
-        var eventId = Guid.NewGuid();
-        var existing = new Event(
-            "Старое",
-            DateTime.UtcNow.AddDays(1),
-            DateTime.UtcNow.AddDays(2),
-            10);
-
-        _repoMock.Setup(r => r.GetByIdAsync(eventId)).ReturnsAsync(existing);
-        _repoMock.Setup(r => r.UpdateAsync(It.IsAny<Event>())).Returns(Task.CompletedTask);
-
-        await _manager.UpdateAsync(
-            eventId,
-            "Новое",
-            null,
-            DateTime.UtcNow.AddDays(3),
-            DateTime.UtcNow.AddDays(4),
-            20);
-
-        _cacheMock.Verify(
-            c => c.RemoveAsync($"event:{eventId}", It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task DeleteAsync_ShouldInvalidateCacheAfterDatabaseDelete()
-    {
-        var eventId = Guid.NewGuid();
-
-        _repoMock.Setup(r => r.ExistsAsync(eventId)).ReturnsAsync(true);
-        _repoMock.Setup(r => r.DeleteAsync(eventId)).Returns(Task.CompletedTask);
-
-        await _manager.DeleteAsync(eventId);
-
-        _cacheMock.Verify(
-            c => c.RemoveAsync($"event:{eventId}", It.IsAny<CancellationToken>()),
-            Times.Once);
     }
 }
