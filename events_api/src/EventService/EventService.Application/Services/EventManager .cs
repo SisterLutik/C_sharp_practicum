@@ -108,7 +108,7 @@ public class EventManager : IEventService
     }
 
     public async Task<Event> UpdateAsync(
-        Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
+    Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
         var existingEvent = await _eventRepository.GetByIdAsync(id)
             ?? throw new NotFoundException($"Событие с id {id} не найдено");
@@ -117,12 +117,14 @@ public class EventManager : IEventService
             throw new ValidationException("EndAt должен быть позже StartAt");
 
         existingEvent.UpdateDetails(title, description, startAt, endAt, totalSeats);
+
+        // Сначала сохраняем в БД
         await _eventRepository.UpdateAsync(existingEvent);
 
-        // Инвалидация кеша — ЭТАП 5. Пока не реализуем, но место обозначено.
-        // await _cache.RemoveAsync($"event:{id}");
+        // Потом инвалидируем кеш
+        await _cache.RemoveAsync($"event:{id}");
 
-        _logger.LogInformation("Обновлено событие {EventId}", id);
+        _logger.LogInformation("Обновлено событие {EventId}, кеш инвалидирован", id);
         return existingEvent;
     }
 
@@ -132,12 +134,13 @@ public class EventManager : IEventService
         if (!exists)
             throw new NotFoundException($"Событие с id {id} не найдено");
 
+        // Сначала удаляем из БД
         await _eventRepository.DeleteAsync(id);
 
-        // Инвалидация кеша — ЭТАП 5.
-        // await _cache.RemoveAsync($"event:{id}");
+        // Потом инвалидируем кеш
+        await _cache.RemoveAsync($"event:{id}");
 
-        _logger.LogInformation("Удалено событие {EventId}", id);
+        _logger.LogInformation("Удалено событие {EventId}, кеш инвалидирован", id);
     }
 
     // Маппинг Domain → DTO

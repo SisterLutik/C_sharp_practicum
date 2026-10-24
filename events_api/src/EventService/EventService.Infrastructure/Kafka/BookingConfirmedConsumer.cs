@@ -1,13 +1,14 @@
-﻿using System.Text.Json;
-using Confluent.Kafka;
-using EventService.Infrastructure.DataAccess;
+﻿using Confluent.Kafka;
 using EventsApi.Contracts.Kafka;
+using EventService.Application.Interfaces;
 using EventService.Domain.Entities;
+using EventService.Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace EventService.Infrastructure.Kafka;
 
@@ -98,10 +99,16 @@ public class BookingConfirmedConsumer : BackgroundService
             return;
         }
 
-        if (booking == null) return;
+        if (booking == null)
+        {
+            _logger.LogWarning("Пустое сообщение — пропускаем");
+            return;
+        }
 
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<EventDbContext>();
+        var cache = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
         var alreadyProcessed = await context.ProcessedBookings
             .AnyAsync(p => p.BookingId == booking.BookingId, stoppingToken);
 
@@ -123,7 +130,6 @@ public class BookingConfirmedConsumer : BackgroundService
             return;
         }
 
-        // Проверка: событие ещё не началось
         if (eventEntity.HasStarted())
         {
             _logger.LogWarning(
@@ -140,13 +146,16 @@ public class BookingConfirmedConsumer : BackgroundService
             return;
         }
 
-        // Записываем в обработанные
         context.ProcessedBookings.Add(new ProcessedBooking(booking.BookingId));
 
+        // Сначала БД
         await context.SaveChangesAsync(stoppingToken);
 
+        // Потом кеш
+        await cache.RemoveAsync($"event:{booking.EventId}", stoppingToken);
+
         _logger.LogInformation(
-            "Уменьшено на {Seats} мест событие {EventId}. Осталось: {Available}",
+            "Уменьшено на {Seats} мест событие {EventId}. Осталось: {Available}. Кеш инвалидирован",
             booking.SeatsCount, booking.EventId, eventEntity.AvailableSeats);
     }
 }

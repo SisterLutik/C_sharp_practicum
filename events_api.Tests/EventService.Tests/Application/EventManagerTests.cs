@@ -295,4 +295,44 @@ public class EventManagerTests
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
+    [Fact]
+    public async Task UpdateAsync_ShouldInvalidateCacheAfterDatabaseUpdate()
+    {
+        var eventId = Guid.NewGuid();
+        var existing = new Event(
+            "Старое",
+            DateTime.UtcNow.AddDays(1),
+            DateTime.UtcNow.AddDays(2),
+            10);
+
+        _repoMock.Setup(r => r.GetByIdAsync(eventId)).ReturnsAsync(existing);
+        _repoMock.Setup(r => r.UpdateAsync(It.IsAny<Event>())).Returns(Task.CompletedTask);
+
+        await _manager.UpdateAsync(
+            eventId,
+            "Новое",
+            null,
+            DateTime.UtcNow.AddDays(3),
+            DateTime.UtcNow.AddDays(4),
+            20);
+
+        _cacheMock.Verify(
+            c => c.RemoveAsync($"event:{eventId}", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldInvalidateCacheAfterDatabaseDelete()
+    {
+        var eventId = Guid.NewGuid();
+
+        _repoMock.Setup(r => r.ExistsAsync(eventId)).ReturnsAsync(true);
+        _repoMock.Setup(r => r.DeleteAsync(eventId)).Returns(Task.CompletedTask);
+
+        await _manager.DeleteAsync(eventId);
+
+        _cacheMock.Verify(
+            c => c.RemoveAsync($"event:{eventId}", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }
