@@ -1,13 +1,13 @@
 ﻿using EventService.Application.Interfaces;
+using EventService.Application.Settings;
+using EventService.Infrastructure.Caching;
 using EventService.Infrastructure.DataAccess;
 using EventService.Infrastructure.Kafka;
 using EventService.Infrastructure.Repositories;
-using EventService.Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
-
 
 namespace EventService.Infrastructure;
 
@@ -24,22 +24,24 @@ public static class DependencyInjection
 
         services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
 
-        services.Configure<RedisSettings>(configuration.GetSection(RedisSettings.SectionName));
+        services.Configure<CacheSettings>(configuration.GetSection(CacheSettings.SectionName));
 
         services.AddSingleton<IConnectionMultiplexer>(sp =>
         {
             var settings = configuration
-                .GetSection(RedisSettings.SectionName)
-                .Get<RedisSettings>()
+                .GetSection(CacheSettings.SectionName)
+                .Get<CacheSettings>()
                 ?? throw new InvalidOperationException(
-                    "Секция Redis не найдена в конфигурации");
+                    "Секция Cache не найдена в конфигурации");
 
-            return ConnectionMultiplexer.Connect(settings.ConnectionString);
+            var options = ConfigurationOptions.Parse(settings.ConnectionString);
+            options.AbortOnConnectFail = false;
+
+            return ConnectionMultiplexer.Connect(options);
         });
 
         services.AddScoped<ICacheService, RedisCacheService>();
 
         return services;
-
     }
 }

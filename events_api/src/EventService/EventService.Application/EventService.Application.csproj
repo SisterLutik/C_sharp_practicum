@@ -9,6 +9,7 @@
     <PackageReference Include="Confluent.Kafka" Version="2.16.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Walter.Web.FireWall.ILogger" Version="2025.9.1452" />
   </ItemGroup>
 
   <PropertyGroup>

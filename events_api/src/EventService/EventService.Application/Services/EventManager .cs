@@ -1,37 +1,38 @@
 ﻿using EventService.Application.DTOs;
 using EventService.Application.Interfaces;
+using EventService.Application.Settings;
 using EventService.Domain.Entities;
 using EventService.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EventService.Application.Services;
 
 public class EventManager : IEventService
 {
-    private const int EventCacheTtlMinutes = 5;
-    private const int TopCacheTtlMinutes = 10;
     private const string TopEventsCacheKey = "events:top10";
 
     private readonly IEventRepository _eventRepository;
     private readonly ICacheService _cache;
+    private readonly CacheSettings _cacheSettings;
     private readonly ILogger<EventManager> _logger;
 
     public EventManager(
         IEventRepository eventRepository,
         ICacheService cache,
+        IOptions<CacheSettings> cacheSettings,
         ILogger<EventManager> logger)
     {
         _eventRepository = eventRepository;
         _cache = cache;
+        _cacheSettings = cacheSettings.Value;
         _logger = logger;
     }
 
-    // Cache-Aside: GET /events/{id}
     public async Task<EventResponse?> GetByIdAsync(Guid id)
     {
         var cacheKey = $"event:{id}";
 
-        // 1. Пробуем из кеша
         var cached = await _cache.GetAsync<EventResponse>(cacheKey);
         if (cached != null)
         {
@@ -39,23 +40,22 @@ public class EventManager : IEventService
             return cached;
         }
 
-        // 2. Cache miss — идём в БД
         var eventItem = await _eventRepository.GetByIdAsync(id);
         if (eventItem == null)
             return null;
 
-        // 3. Кладём в кеш с TTL
         var response = ToResponse(eventItem);
-        await _cache.SetAsync(cacheKey, response, TimeSpan.FromMinutes(EventCacheTtlMinutes));
+        await _cache.SetAsync(
+            cacheKey,
+            response,
+            TimeSpan.FromMinutes(_cacheSettings.EventTtlMinutes));
 
         _logger.LogDebug("Событие {EventId} загружено из БД и закешировано", id);
         return response;
     }
 
-    //  Cache-Aside: GET /events/top
     public async Task<List<EventResponse>> GetTopEventsAsync(int count = 10)
     {
-        // 1. Пробуем из кеша
         var cached = await _cache.GetAsync<List<EventResponse>>(TopEventsCacheKey);
         if (cached != null)
         {
@@ -63,21 +63,17 @@ public class EventManager : IEventService
             return cached;
         }
 
-        // 2. Cache miss — идём в БД
         var top = await _eventRepository.GetTopBySalesPercentageAsync(count);
         var response = top.Select(ToResponse).ToList();
 
-        // 3. Кладём в кеш с TTL
         await _cache.SetAsync(
             TopEventsCacheKey,
             response,
-            TimeSpan.FromMinutes(TopCacheTtlMinutes));
+            TimeSpan.FromMinutes(_cacheSettings.TopEventsTtlMinutes));
 
         _logger.LogDebug("Топ-{Count} событий загружен из БД и закеширован", count);
         return response;
     }
-
-    // Остальные методы — без кеша
 
     public async Task<PaginatedResult<Event>> GetAllAsync(
         string? title, DateTime? from, DateTime? to, int page, int pageSize)
@@ -108,7 +104,7 @@ public class EventManager : IEventService
     }
 
     public async Task<Event> UpdateAsync(
-    Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
+        Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
         var existingEvent = await _eventRepository.GetByIdAsync(id)
             ?? throw new NotFoundException($"Событие с id {id} не найдено");
@@ -117,11 +113,8 @@ public class EventManager : IEventService
             throw new ValidationException("EndAt должен быть позже StartAt");
 
         existingEvent.UpdateDetails(title, description, startAt, endAt, totalSeats);
-
-        // Сначала сохраняем в БД
         await _eventRepository.UpdateAsync(existingEvent);
 
-        // Потом инвалидируем кеш
         await _cache.RemoveAsync($"event:{id}");
 
         _logger.LogInformation("Обновлено событие {EventId}, кеш инвалидирован", id);
@@ -134,16 +127,13 @@ public class EventManager : IEventService
         if (!exists)
             throw new NotFoundException($"Событие с id {id} не найдено");
 
-        // Сначала удаляем из БД
         await _eventRepository.DeleteAsync(id);
 
-        // Потом инвалидируем кеш
         await _cache.RemoveAsync($"event:{id}");
 
         _logger.LogInformation("Удалено событие {EventId}, кеш инвалидирован", id);
     }
 
-    // Маппинг Domain → DTO
     private static EventResponse ToResponse(Event e) => new()
     {
         Id = e.Id,

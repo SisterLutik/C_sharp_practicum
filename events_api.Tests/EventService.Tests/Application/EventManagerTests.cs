@@ -3,6 +3,8 @@ using EventService.Application.Interfaces;
 using EventService.Application.Services;
 using EventService.Domain.Entities;
 using EventService.Domain.Exceptions;
+using EventService.Application.Settings;
+using Microsoft.Extensions.Options;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -21,9 +23,16 @@ public class EventManagerTests
         _repoMock = new Mock<IEventRepository>();
         _cacheMock = new Mock<ICacheService>();
 
+        var cacheSettings = Options.Create(new CacheSettings
+        {
+            EventTtlMinutes = 5,
+            TopEventsTtlMinutes = 10
+        });
+
         _manager = new EventManager(
             _repoMock.Object,
             _cacheMock.Object,
+            cacheSettings,
             NullLogger<EventManager>.Instance);
     }
 

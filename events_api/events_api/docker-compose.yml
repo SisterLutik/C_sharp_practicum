@@ -106,10 +106,10 @@ services:
       Jwt__Audience: ${JWT_AUDIENCE}
       Kafka__BootstrapServers: kafka:9092
       Kafka__ConsumerGroup: event-service
-      Redis__ConnectionString: "redis:6379"
-      Redis__InstanceName: "events:"
-      Redis__DefaultExpirationMinutes: 5
-    entrypoint: ["dotnet", "EventService.Presentation.dll"]
+      Cache__ConnectionString: "redis:6379"
+      Cache__InstanceName: "events:"
+      Cache__EventTtlMinutes: 5
+      Cache__TopEventsTtlMinutes: 10
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using EventService.Application.Interfaces;
+using EventService.Application.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -9,12 +10,12 @@ namespace EventService.Infrastructure.Caching;
 public class RedisCacheService : ICacheService
 {
     private readonly IConnectionMultiplexer _redis;
-    private readonly RedisSettings _settings;
+    private readonly CacheSettings _settings;
     private readonly ILogger<RedisCacheService> _logger;
 
     public RedisCacheService(
         IConnectionMultiplexer redis,
-        IOptions<RedisSettings> settings,
+        IOptions<CacheSettings> settings,
         ILogger<RedisCacheService> logger)
     {
         _redis = redis;
@@ -22,7 +23,6 @@ public class RedisCacheService : ICacheService
         _logger = logger;
     }
 
-    // GET — при ошибке возвращаем default (null)
     public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
     {
         try
@@ -38,35 +38,29 @@ public class RedisCacheService : ICacheService
         catch (RedisException ex)
         {
             _logger.LogWarning(ex,
-                "Redis недоступен при чтении ключа {Key}. Кэш деградирован, запрос пойдёт в БД.",
-                key);
+                "Redis недоступен при чтении ключа {Key}. Кэш деградирован.", key);
             return default;
         }
         catch (TimeoutException ex)
         {
             _logger.LogWarning(ex,
-                "Таймаут Redis при чтении ключа {Key}. Кэш деградирован.",
-                key);
+                "Таймаут Redis при чтении ключа {Key}. Кэш деградирован.", key);
             return default;
         }
         catch (JsonException ex)
         {
             _logger.LogWarning(ex,
-                "Ошибка десериализации значения из Redis по ключу {Key}. Значение будет проигнорировано.",
-                key);
+                "Ошибка десериализации значения из Redis по ключу {Key}", key);
             return default;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "Неожиданная ошибка кэша при чтении ключа {Key}.",
-                key);
+                "Неожиданная ошибка кэша при чтении ключа {Key}", key);
             return default;
         }
     }
 
-    // SET — при ошибке НЕ пробрасываем, только логируем.
-    // Запись в кеш — не критично, данные всё равно в БД.
     public async Task SetAsync<T>(
         string key,
         T value,
@@ -77,41 +71,29 @@ public class RedisCacheService : ICacheService
         {
             var db = _redis.GetDatabase();
             var json = JsonSerializer.Serialize(value);
-            var ttl = expiry ?? TimeSpan.FromMinutes(_settings.DefaultExpirationMinutes);
+
+            // Если expiry не передан — используем TTL события по умолчанию.
+            // Другие TTL (например, для топа) EventManager передаёт явно.
+            var ttl = expiry ?? TimeSpan.FromMinutes(_settings.EventTtlMinutes);
 
             await db.StringSetAsync(_settings.InstanceName + key, json, ttl);
         }
         catch (RedisException ex)
         {
             _logger.LogWarning(ex,
-                "Redis недоступен при записи ключа {Key}. Кэш не обновлён, но данные уже сохранены в БД.",
-                key);
+                "Redis недоступен при записи ключа {Key}. Кэш не обновлён.", key);
         }
         catch (TimeoutException ex)
         {
             _logger.LogWarning(ex,
-                "Таймаут Redis при записи ключа {Key}. Кэш не обновлён.",
-                key);
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogWarning(ex,
-                "Ошибка сериализации значения для ключа {Key}. Кэш не обновлён.",
-                key);
+                "Таймаут Redis при записи ключа {Key}. Кэш не обновлён.", key);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "Неожиданная ошибка кэша при записи ключа {Key}.",
-                key);
+                "Неожиданная ошибка кэша при записи ключа {Key}", key);
         }
     }
-
-    // REMOVE — при ошибке НЕ пробрасываем, только логируем.
-    // Ключ просто останется в кеше до истечения TTL,
-    // следующий читающий запрос вернёт актуальные данные,
-    // если TTL истечёт. Если критично — можно явно проверить
-    // и попробовать инвалидировать позже.
 
     public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
     {
@@ -123,21 +105,17 @@ public class RedisCacheService : ICacheService
         catch (RedisException ex)
         {
             _logger.LogWarning(ex,
-                "Redis недоступен при удалении ключа {Key}. Кэш не инвалидирован, " +
-                "но данные уже обновлены в БД. Ключ истечёт по TTL.",
-                key);
+                "Redis недоступен при удалении ключа {Key}. Кэш не инвалидирован.", key);
         }
         catch (TimeoutException ex)
         {
             _logger.LogWarning(ex,
-                "Таймаут Redis при удалении ключа {Key}. Кэш не инвалидирован.",
-                key);
+                "Таймаут Redis при удалении ключа {Key}. Кэш не инвалидирован.", key);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "Неожиданная ошибка кэша при удалении ключа {Key}.",
-                key);
+                "Неожиданная ошибка кэша при удалении ключа {Key}", key);
         }
     }
 }
