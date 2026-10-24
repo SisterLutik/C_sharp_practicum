@@ -1,6 +1,6 @@
 Events API
 
-Микросервисная система управления событиями и бронированиями с асинхронной обработкой через Kafka.
+Микросервисная система управления событиями и бронированиями с асинхронной обработкой через Kafka и кэшированием в Redis.
 
 Требования
 
@@ -8,6 +8,7 @@ Events API
 - Docker Desktop (для запуска всей системы)
 - PostgreSQL (для локальной разработки без Docker)
 - Kafka (для локальной разработки без Docker)
+- Redis (для локальной разработки без Docker)
 
 Архитектура
 
@@ -16,15 +17,17 @@ Events API
 Схема зависимостей между сервисами
 
 UserService      →  выдаёт JWT-токен
-EventService     →  управляет событиями и местами
+EventService     →  управляет событиями и местами, кэширует события в Redis
 BookingService   →  управляет бронями, публикует BookingConfirmed в Kafka
 Kafka            →  BookingService публикует, EventService читает
+Redis            →  EventService использует для кэширования
 
 Обмен между сервисами
 
 - Kafka: BookingService публикует BookingConfirmed при подтверждении брони. EventService читает сообщение и уменьшает AvailableSeats у события.
 - JWT: токен выдаёт только UserService, остальные сервисы проверяют его по общему секрету.
 - Прямого HTTP-взаимодействия между сервисами нет.
+- Redis: используется только внутри EventService, другие сервисы его не знают.
 
 Структура решения
 
@@ -43,7 +46,9 @@ events_api/                              корень репозитория
 │   ├── EventService/
 │   │   ├── EventService.Domain/
 │   │   ├── EventService.Application/
+│   │   │   └── Settings/               CacheSettings (ConnectionString, TTL)
 │   │   ├── EventService.Infrastructure/
+│   │   │   └── Caching/                RedisSettings удалён, RedisCacheService
 │   │   └── EventService.Presentation/
 │   │
 │   └── BookingService/
@@ -70,9 +75,9 @@ events_api/                              корень репозитория
 
 - Domain — доменные сущности (User, Event, Booking), перечисления (UserRole, BookingStatus), доменные исключения. Не зависит ни от чего внешнего.
 
-- Application — бизнес-логика, интерфейсы сервисов и портов (IUserRepository, IEventPublisher, IBookingRepository), DTO. Зависит только от Domain.
+- Application — бизнес-логика, интерфейсы сервисов и портов (IUserRepository, IEventPublisher, IBookingRepository, ICacheService), DTO, настройки (CacheSettings). Зависит только от Domain.
 
-- Infrastructure — реализации портов: репозитории, DbContext, миграции, Kafka-продюсеры и консьюмеры, компоненты безопасности. Зависит от Application и Domain.
+- Infrastructure — реализации портов: репозитории, DbContext, миграции, Kafka-продюсеры и консьюмеры, RedisCacheService, компоненты безопасности. Зависит от Application и Domain.
 
 - Presentation — контроллеры, middleware, Program.cs, фоновые сервисы. Зависит от Application и Infrastructure.
 
@@ -91,6 +96,7 @@ UserService:
 
 EventService:
 - GET /api/events — публичный
+- GET /api/events/top — публичный
 - GET /api/events/{id} — публичный
 - POST /api/events — только Admin
 - PUT /api/events/{id} — только Admin
@@ -133,6 +139,8 @@ docker compose up --build
 
 docker compose ps
 
+Ожидается шесть контейнеров: events-kafka, events-postgres, events-redis, events-user-service, events-event-service, events-booking-service.
+
 6. Откройте Swagger UI:
 
 - http://localhost:5001/swagger — UserService
@@ -148,6 +156,7 @@ Docker внутренний порт — 8080 для всех сервисов. 
 5002 | EventService
 5003 | BookingService
 5432 | PostgreSQL (один инстанс, три базы)
+6379 | Redis (для отладки через redis-cli с хоста)
 9093 | Kafka (внешний listener для подключения с хоста)
 
 Остановка:
@@ -160,7 +169,7 @@ docker compose down -v
 
 Запуск без Docker
 
-1. Установите PostgreSQL и Kafka.
+1. Установите PostgreSQL, Kafka и Redis.
 
 2. Создайте три базы:
 
@@ -168,7 +177,11 @@ psql -U postgres -c "CREATE DATABASE users_db;"
 psql -U postgres -c "CREATE DATABASE events_db;"
 psql -U postgres -c "CREATE DATABASE bookings_db;"
 
-3. В каждом Presentation настройте секреты через user-secrets:
+3. Убедитесь, что Redis запущен на localhost:6379. Быстрый способ через Docker:
+
+docker run -d --name events-redis -p 6379:6379 redis:7-alpine
+
+4. В каждом Presentation настройте секреты через user-secrets:
 
 cd src/UserService/UserService.Presentation
 dotnet user-secrets init
@@ -184,7 +197,7 @@ dotnet user-secrets set "Jwt:Secret" "super-secret-key-minimum-32-characters-lon
 
 Секрет должен быть одинаковым во всех трёх сервисах.
 
-4. Запустите каждый сервис в отдельном терминале из корня репозитория:
+5. Запустите каждый сервис в отдельном терминале из корня репозитория:
 
 dotnet run --project src/UserService/UserService.Presentation
 dotnet run --project src/EventService/EventService.Presentation
@@ -226,6 +239,66 @@ Kafka запускается в режиме KRaft (без Zookeeper). Один 
 Ручная проверка топика:
 
 docker exec events-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic booking-confirmed --from-beginning
+
+Настройка Redis
+
+Redis используется только в EventService для кэширования чтения событий.
+
+Параметры кэша хранятся в appsettings.json EventService в секции Cache:
+
+- ConnectionString — строка подключения к Redis (localhost:6379 локально, redis:6379 в Docker)
+- InstanceName — префикс ключей (events:)
+- EventTtlMinutes — TTL одного события в минутах (5)
+- TopEventsTtlMinutes — TTL топа событий в минутах (10)
+
+В Docker строка подключения переопределяется переменной Cache__ConnectionString=redis:6379 в docker-compose.yml. Внутри Docker-сети сервисы обращаются друг к другу по имени контейнера, поэтому redis, а не localhost.
+
+Проверка подключения:
+
+docker exec events-redis redis-cli ping
+
+Ожидается PONG.
+
+Кэширование
+
+В EventService используется паттерн Cache-Aside для двух сценариев чтения.
+
+Что кэшируется:
+
+Ключ | Что | TTL
+event:{id} | Одно событие по id | 5 минут
+events:top10 | Топ-10 событий по проценту проданных мест | 10 минут
+
+Процент продаж считается по формуле (totalSeats - availableSeats) / totalSeats. Отсортированный по убыванию список из первых десяти событий возвращается эндпоинтом GET /api/events/top.
+
+Почему такие TTL:
+
+- event:{id} — 5 минут. Отдельное событие меняется редко, а при изменении ключ инвалидируется явно. Даже если инвалидация не сработает, устаревание ограничено пятью минутами.
+- events:top10 — 10 минут. Это рейтинговый агрегат, который меняется медленно. Явная инвалидация при каждом бронировании была бы избыточной, список всё равно пересобирается нечасто.
+
+Стратегия инвалидации:
+
+Для отдельного события используется инвалидация при записи. При обновлении или удалении события ключ event:{id} удаляется из кэша. Следующий читающий запрос обратится к БД и прогреет кэш заново. Такой подход выбран вместо обновления при записи, потому что он проще и не требует маппинга доменной сущности в DTO внутри метода сохранения.
+
+Топ-10 при мутациях не инвалидируется. Кэш обновляется только по TTL.
+
+Порядок операций:
+
+Сначала изменение сохраняется в базу данных, и только потом инвалидируется кэш. Если выполнение оборвётся между этими двумя шагами, в БД останутся актуальные данные, а кэш при следующем запросе просто обновится. Обратный порядок (сначала кэш, потом БД) создал бы риск потерять актуальные данные.
+
+Инвалидация в фоновой обработке:
+
+BookingConfirmedConsumer при получении сообщения из Kafka уменьшает AvailableSeats у события и после SaveChangesAsync инвалидирует ключ event:{EventId}. Иначе кэш вернул бы старое количество мест.
+
+Поведение при недоступности Redis:
+
+Ошибки Redis логируются, но не пробрасываются. Если Redis упал:
+
+- GetAsync возвращает null, запрос идёт в БД
+- SetAsync тихо пропускает запись (данные уже в БД)
+- RemoveAsync тихо пропускает удаление (ключ истечёт по TTL)
+
+Клиент не получает ошибку, запрос обслуживается напрямую из БД. Для быстрого переподключения у ConnectionMultiplexer установлен AbortOnConnectFail=false: после восстановления Redis кэш начнёт работать автоматически без перезапуска сервиса.
 
 Базы данных
 
@@ -278,6 +351,7 @@ EventService читает BookingConfirmed и уменьшает AvailableSeats 
    - проверяет, не обрабатывалась ли эта бронь раньше (идемпотентность);
    - проверяет, что событие существует и ещё не началось;
    - уменьшает AvailableSeats на 1 и сохраняет в events_db;
+   - инвалидирует кэш event:{EventId};
    - записывает отметку в ProcessedBookings.
 
 5. Если Kafka недоступна, сообщение останется в топике и будет доставлено при перезапуске.
@@ -363,6 +437,12 @@ dotnet test tests/IntegrationTests/IntegrationTests.csproj
 
 Юнит-тесты используют InMemory-провайдер EF Core, интеграционные — Testcontainers с реальным PostgreSQL в Docker.
 
+Тесты кэширования в EventService.Tests покрывают:
+
+- при попадании в кэш репозиторий не вызывается;
+- при промахе данные берутся из репозитория и сохраняются в кэш с TTL из CacheSettings;
+- при мутирующих операциях кэш инвалидируется после сохранения в БД (проверяется порядок операций).
+
 Основные эндпоинты
 
 UserService (порт 5001)
@@ -373,7 +453,8 @@ UserService (порт 5001)
 EventService (порт 5002)
 
 - GET /api/events — список с фильтрацией и пагинацией
-- GET /api/events/{id} — событие по ID
+- GET /api/events/top — топ-10 событий по проценту проданных мест (кэшируется)
+- GET /api/events/{id} — событие по ID (кэшируется)
 - POST /api/events — создать (Admin)
 - PUT /api/events/{id} — обновить (Admin)
 - DELETE /api/events/{id} — удалить (Admin)
@@ -450,6 +531,7 @@ UserRole
 - ASP.NET Core 10.0
 - Entity Framework Core 10
 - PostgreSQL 16
+- Redis 7 (StackExchange.Redis)
 - Apache Kafka (KRaft)
 - Confluent.Kafka
 - JWT (System.IdentityModel.Tokens.Jwt)
@@ -488,6 +570,12 @@ docker exec -it events-postgres psql -U postgres -d events_db
 Проверка сообщений в Kafka:
 
 docker exec events-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic booking-confirmed --from-beginning
+
+Проверка Redis:
+
+docker exec events-redis redis-cli ping
+docker exec events-redis redis-cli KEYS "events:*"
+docker exec events-redis redis-cli TTL "events:top10"
 
 Удаление всех данных (включая тома):
 
