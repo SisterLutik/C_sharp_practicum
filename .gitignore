@@ -1,7 +1,7 @@
 **/obj/
 **/bin/
 
-
+.env
 *.dll
 *.exe
 *.suo
@@ -22,3 +22,4 @@ events_api.Tests/.vs
 events_api/events_api.IntegrationTests/bin
 events_api/events_api.IntegrationTests/obj
 events_api/events_api.IntegrationTests/.vs
+/events_api/events_api/.env

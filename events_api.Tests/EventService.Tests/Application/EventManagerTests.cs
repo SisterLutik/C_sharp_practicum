@@ -135,6 +135,10 @@ public class EventManagerTests
             DateTime.UtcNow.AddDays(2),
             10);
 
+        // Event генерирует свой Id в конструкторе, поэтому кэшироваться
+        // будет именно eventEntity.Id, а не eventId из URL.
+        var actualId = eventEntity.Id;
+
         _cacheMock
             .Setup(c => c.GetAsync<EventResponse>(
                 $"event:{eventId}",
@@ -155,7 +159,7 @@ public class EventManagerTests
         _cacheMock.Verify(
             c => c.SetAsync(
                 $"event:{eventId}",
-                It.Is<EventResponse>(e => e.Id == eventId && e.Title == "Из БД"),
+                It.Is<EventResponse>(e => e.Id == actualId && e.Title == "Из БД"),
                 TimeSpan.FromMinutes(5),
                 It.IsAny<CancellationToken>()),
             Times.Once);

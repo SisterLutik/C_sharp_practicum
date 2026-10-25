@@ -1,5 +1,6 @@
 using EventService.Application.DTOs;
 using EventService.Application.Interfaces;
+using EventService.Domain.Entities;
 using EventService.Domain.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +18,6 @@ public class EventsController : ControllerBase
         _eventService = eventService;
     }
 
-    // GET /api/events/top — топ-10 по продажам
     [HttpGet("top")]
     [ProducesResponseType(typeof(List<EventResponse>), 200)]
     public async Task<IActionResult> GetTop()
@@ -26,7 +26,6 @@ public class EventsController : ControllerBase
         return Ok(result);
     }
 
-    // GET /api/events
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResult<EventResponse>), 200)]
     public async Task<IActionResult> GetAll(
@@ -48,7 +47,6 @@ public class EventsController : ControllerBase
         });
     }
 
-    // GET /api/events/{id} — Cache-Aside
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(EventResponse), 200)]
     [ProducesResponseType(404)]
@@ -58,12 +56,58 @@ public class EventsController : ControllerBase
         if (eventItem == null)
             throw new NotFoundException($"Событие с id {id} не найдено");
 
-        return Ok(eventItem);   // ← уже EventResponse, не нужно мапить
+        return Ok(eventItem);
     }
 
-    // ... Create, Update, Delete, Reserve, Release — как раньше
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(EventResponse), 201)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
+    {
+        var newEvent = await _eventService.CreateEventAsync(
+            request.Title,
+            request.Description,
+            request.StartAt,
+            request.EndAt,
+            request.TotalSeats);
 
-    private static EventResponse ToResponse(Domain.Entities.Event e) => new()
+        var response = ToResponse(newEvent);
+        return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, response);
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(EventResponse), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
+    {
+        var updated = await _eventService.UpdateAsync(
+            id,
+            request.Title,
+            request.Description,
+            request.StartAt,
+            request.EndAt,
+            request.TotalSeats);
+
+        return Ok(ToResponse(updated));
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        await _eventService.DeleteAsync(id);
+        return NoContent();
+    }
+
+    private static EventResponse ToResponse(Event e) => new()
     {
         Id = e.Id,
         Title = e.Title,
