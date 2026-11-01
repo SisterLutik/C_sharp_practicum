@@ -1,7 +1,9 @@
 ﻿using Confluent.Kafka;
 using EventsApi.Contracts.Kafka;
+using EventService.Application.Caching;
 using EventService.Application.Interfaces;
 using EventService.Domain.Entities;
+using EventService.Application.Caching;
 using EventService.Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -86,7 +88,7 @@ public class BookingConfirmedConsumer : BackgroundService
         }
     }
 
-    private async Task HandleMessageAsync(string json, CancellationToken stoppingToken)
+    internal async Task HandleMessageAsync(string json, CancellationToken stoppingToken)
     {
         BookingConfirmed? booking;
         try
@@ -152,7 +154,7 @@ public class BookingConfirmedConsumer : BackgroundService
         await context.SaveChangesAsync(stoppingToken);
 
         // Потом кеш
-        await cache.RemoveAsync($"event:{booking.EventId}", stoppingToken);
+        await cache.RemoveAsync(CacheKeys.Event(booking.EventId), stoppingToken);
 
         _logger.LogInformation(
             "Уменьшено на {Seats} мест событие {EventId}. Осталось: {Available}. Кеш инвалидирован",

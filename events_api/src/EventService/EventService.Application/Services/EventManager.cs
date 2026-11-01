@@ -1,4 +1,5 @@
-﻿using EventService.Application.DTOs;
+﻿using EventService.Application.Caching;
+using EventService.Application.DTOs;
 using EventService.Application.Interfaces;
 using EventService.Application.Settings;
 using EventService.Domain.Entities;
@@ -10,8 +11,6 @@ namespace EventService.Application.Services;
 
 public class EventManager : IEventService
 {
-    private const string TopEventsCacheKey = "events:top10";
-
     private readonly IEventRepository _eventRepository;
     private readonly ICacheService _cache;
     private readonly CacheSettings _cacheSettings;
@@ -31,7 +30,7 @@ public class EventManager : IEventService
 
     public async Task<EventResponse?> GetByIdAsync(Guid id)
     {
-        var cacheKey = $"event:{id}";
+        var cacheKey = CacheKeys.Event(id);
 
         var cached = await _cache.GetAsync<EventResponse>(cacheKey);
         if (cached != null)
@@ -56,7 +55,9 @@ public class EventManager : IEventService
 
     public async Task<List<EventResponse>> GetTopEventsAsync(int count = 10)
     {
-        var cached = await _cache.GetAsync<List<EventResponse>>(TopEventsCacheKey);
+        var cacheKey = CacheKeys.TopEvents(count);
+
+        var cached = await _cache.GetAsync<List<EventResponse>>(cacheKey);
         if (cached != null)
         {
             _logger.LogDebug("Топ-{Count} событий получен из кеша", count);
@@ -67,7 +68,7 @@ public class EventManager : IEventService
         var response = top.Select(ToResponse).ToList();
 
         await _cache.SetAsync(
-            TopEventsCacheKey,
+            cacheKey,
             response,
             TimeSpan.FromMinutes(_cacheSettings.TopEventsTtlMinutes));
 
@@ -115,7 +116,7 @@ public class EventManager : IEventService
         existingEvent.UpdateDetails(title, description, startAt, endAt, totalSeats);
         await _eventRepository.UpdateAsync(existingEvent);
 
-        await _cache.RemoveAsync($"event:{id}");
+        await _cache.RemoveAsync(CacheKeys.Event(id));
 
         _logger.LogInformation("Обновлено событие {EventId}, кеш инвалидирован", id);
         return existingEvent;
@@ -129,12 +130,13 @@ public class EventManager : IEventService
 
         await _eventRepository.DeleteAsync(id);
 
-        await _cache.RemoveAsync($"event:{id}");
+        await _cache.RemoveAsync(CacheKeys.Event(id));
 
         _logger.LogInformation("Удалено событие {EventId}, кеш инвалидирован", id);
     }
 
-    private static EventResponse ToResponse(Event e) => new()
+    // Публичный маппинг, чтобы контроллер его переиспользовал
+    public static EventResponse ToResponse(Event e) => new()
     {
         Id = e.Id,
         Title = e.Title,

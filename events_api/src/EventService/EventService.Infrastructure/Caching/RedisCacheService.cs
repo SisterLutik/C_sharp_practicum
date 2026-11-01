@@ -53,12 +53,6 @@ public class RedisCacheService : ICacheService
                 "Ошибка десериализации значения из Redis по ключу {Key}", key);
             return default;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Неожиданная ошибка кэша при чтении ключа {Key}", key);
-            return default;
-        }
     }
 
     public async Task SetAsync<T>(
@@ -71,9 +65,6 @@ public class RedisCacheService : ICacheService
         {
             var db = _redis.GetDatabase();
             var json = JsonSerializer.Serialize(value);
-
-            // Если expiry не передан — используем TTL события по умолчанию.
-            // Другие TTL (например, для топа) EventManager передаёт явно.
             var ttl = expiry ?? TimeSpan.FromMinutes(_settings.EventTtlMinutes);
 
             await db.StringSetAsync(_settings.InstanceName + key, json, ttl);
@@ -88,10 +79,10 @@ public class RedisCacheService : ICacheService
             _logger.LogWarning(ex,
                 "Таймаут Redis при записи ключа {Key}. Кэш не обновлён.", key);
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex,
-                "Неожиданная ошибка кэша при записи ключа {Key}", key);
+            _logger.LogWarning(ex,
+                "Ошибка сериализации значения для ключа {Key}. Кэш не обновлён.", key);
         }
     }
 
@@ -111,11 +102,6 @@ public class RedisCacheService : ICacheService
         {
             _logger.LogWarning(ex,
                 "Таймаут Redis при удалении ключа {Key}. Кэш не инвалидирован.", key);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Неожиданная ошибка кэша при удалении ключа {Key}", key);
         }
     }
 }

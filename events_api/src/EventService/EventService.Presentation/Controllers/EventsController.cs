@@ -1,5 +1,6 @@
 using EventService.Application.DTOs;
 using EventService.Application.Interfaces;
+using EventService.Application.Services;
 using EventService.Domain.Entities;
 using EventService.Domain.Exceptions;
 using Microsoft.AspNetCore.Authorization;
@@ -27,7 +28,6 @@ public class EventsController : ControllerBase
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(PaginatedResult<EventResponse>), 200)]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? title,
         [FromQuery] DateTime? from,
@@ -43,13 +43,11 @@ public class EventsController : ControllerBase
             result.PageSize,
             result.TotalCount,
             result.TotalPages,
-            Items = result.Items.Select(ToResponse)
+            Items = result.Items.Select(EventManager.ToResponse)
         });
     }
 
     [HttpGet("{id}")]
-    [ProducesResponseType(typeof(EventResponse), 200)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> GetById(Guid id)
     {
         var eventItem = await _eventService.GetByIdAsync(id);
@@ -61,9 +59,6 @@ public class EventsController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    [ProducesResponseType(typeof(EventResponse), 201)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(403)]
     public async Task<IActionResult> Create([FromBody] CreateEventRequest request)
     {
         var newEvent = await _eventService.CreateEventAsync(
@@ -73,16 +68,14 @@ public class EventsController : ControllerBase
             request.EndAt,
             request.TotalSeats);
 
-        var response = ToResponse(newEvent);
-        return CreatedAtAction(nameof(GetById), new { id = newEvent.Id }, response);
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = newEvent.Id },
+            EventManager.ToResponse(newEvent));
     }
 
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
-    [ProducesResponseType(typeof(EventResponse), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(403)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEventRequest request)
     {
         var updated = await _eventService.UpdateAsync(
@@ -93,28 +86,14 @@ public class EventsController : ControllerBase
             request.EndAt,
             request.TotalSeats);
 
-        return Ok(ToResponse(updated));
+        return Ok(EventManager.ToResponse(updated));
     }
 
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
-    [ProducesResponseType(204)]
-    [ProducesResponseType(403)]
-    [ProducesResponseType(404)]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _eventService.DeleteAsync(id);
         return NoContent();
     }
-
-    private static EventResponse ToResponse(Event e) => new()
-    {
-        Id = e.Id,
-        Title = e.Title,
-        Description = e.Description,
-        StartAt = e.StartAt,
-        EndAt = e.EndAt,
-        TotalSeats = e.TotalSeats,
-        AvailableSeats = e.AvailableSeats
-    };
 }

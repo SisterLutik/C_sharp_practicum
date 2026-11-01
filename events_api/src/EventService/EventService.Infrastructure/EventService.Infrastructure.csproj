@@ -12,6 +12,7 @@
     <ProjectReference Include="..\EventService.Domain\EventService.Domain.csproj" />
     <ProjectReference Include="..\EventService.Application\EventService.Application.csproj" />
     <ProjectReference Include="..\..\EventsApi.Contracts\EventsApi.Contracts.csproj" />
+    <InternalsVisibleTo Include="EventService.Tests" />
   </ItemGroup>
 
   <ItemGroup>

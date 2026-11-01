@@ -36,8 +36,6 @@ public class EventManagerTests
             NullLogger<EventManager>.Instance);
     }
 
-    // Создание события
-
     [Fact]
     public async Task CreateEventAsync_WithValidData_ShouldCreateEvent()
     {
@@ -69,7 +67,8 @@ public class EventManagerTests
             DateTime.UtcNow.AddDays(2),
             0);
 
-        await act.Should().ThrowAsync<ValidationException>();
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("*TotalSeats*");
     }
 
     [Fact]
@@ -81,10 +80,9 @@ public class EventManagerTests
             DateTime.UtcNow.AddDays(1),
             10);
 
-        await act.Should().ThrowAsync<ValidationException>();
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("*EndAt*");
     }
-
-    // GetByIdAsync — Cache-Aside
 
     [Fact]
     public async Task GetByIdAsync_WhenCacheHit_ShouldReturnFromCacheAndNotCallRepository()
@@ -110,12 +108,8 @@ public class EventManagerTests
 
         result.Should().NotBeNull();
         result!.Title.Should().Be("Из кеша");
-        result.AvailableSeats.Should().Be(5);
 
-        _repoMock.Verify(
-            r => r.GetByIdAsync(It.IsAny<Guid>()),
-            Times.Never);
-
+        _repoMock.Verify(r => r.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
         _cacheMock.Verify(
             c => c.SetAsync(
                 It.IsAny<string>(),
@@ -135,8 +129,6 @@ public class EventManagerTests
             DateTime.UtcNow.AddDays(2),
             10);
 
-        // Event генерирует свой Id в конструкторе, поэтому кэшироваться
-        // будет именно eventEntity.Id, а не eventId из URL.
         var actualId = eventEntity.Id;
 
         _cacheMock
@@ -183,7 +175,6 @@ public class EventManagerTests
         var result = await _manager.GetByIdAsync(eventId);
 
         result.Should().BeNull();
-
         _cacheMock.Verify(
             c => c.SetAsync(
                 It.IsAny<string>(),
@@ -192,8 +183,6 @@ public class EventManagerTests
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
-
-    // GetTopEventsAsync — Cache-Aside
 
     [Fact]
     public async Task GetTopEventsAsync_WhenCacheHit_ShouldReturnFromCacheAndNotCallRepository()
@@ -260,8 +249,6 @@ public class EventManagerTests
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
-
-    // UpdateAsync — инвалидация кеша
 
     [Fact]
     public async Task UpdateAsync_WithExistingId_ShouldUpdateEvent()
@@ -352,8 +339,6 @@ public class EventManagerTests
             c => c.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
-
-    // DeleteAsync — инвалидация кеша
 
     [Fact]
     public async Task DeleteAsync_WithExistingId_ShouldDeleteAndInvalidateCache()

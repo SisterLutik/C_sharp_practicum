@@ -1,12 +1,10 @@
 services:
-  # ============================================
-  # Kafka (KRaft, без Zookeeper)
-  # ============================================
   kafka:
     image: apache/kafka:latest
     container_name: events-kafka
     hostname: kafka
     ports:
+      - "9092:9092"
       - "9093:9093"
     environment:
       KAFKA_NODE_ID: 1
@@ -29,9 +27,6 @@ services:
       retries: 15
       start_period: 30s
 
-  # ============================================
-  # PostgreSQL — один инстанс, три базы
-  # ============================================
   postgres:
     image: postgres:16-alpine
     container_name: events-postgres
@@ -49,9 +44,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # ============================================
-  # Redis — кэш для EventService
-  # ============================================
   redis:
     image: redis:7-alpine
     container_name: events-redis
@@ -63,9 +55,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # ============================================
-  # UserService
-  # ============================================
   user-service:
     build:
       context: ..
@@ -86,9 +75,6 @@ services:
       postgres:
         condition: service_healthy
 
-  # ============================================
-  # EventService
-  # ============================================
   event-service:
     build:
       context: ..
@@ -110,6 +96,7 @@ services:
       Cache__InstanceName: "events:"
       Cache__EventTtlMinutes: 5
       Cache__TopEventsTtlMinutes: 10
+    entrypoint: ["dotnet", "EventService.Presentation.dll"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,9 +105,6 @@ services:
       redis:
         condition: service_healthy
 
-  # ============================================
-  # BookingService
-  # ============================================
   booking-service:
     build:
       context: ..

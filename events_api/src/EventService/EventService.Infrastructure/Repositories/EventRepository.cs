@@ -87,10 +87,8 @@ public class EventRepository : IEventRepository
     int count,
     CancellationToken cancellationToken = default)
     {
-        // Сортировка по проценту проданных мест (по убыванию).
-        // Процент = (TotalSeats - AvailableSeats) / TotalSeats.
-        // EF Core транслирует в SQL ORDER BY.
         return await _context.Events
+            .Where(e => e.TotalSeats > 0)
             .OrderByDescending(e =>
                 (double)(e.TotalSeats - e.AvailableSeats) / e.TotalSeats)
             .Take(count)
