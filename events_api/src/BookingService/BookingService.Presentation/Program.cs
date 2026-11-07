@@ -74,14 +74,21 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddHostedService<BookingBackgroundService>();
 
 // OpenTelemetry
+var otlpEndpoint = builder.Configuration["Otlp:Endpoint"]
+    ?? throw new InvalidOperationException(
+        "Otlp:Endpoint не задан в appsettings.json");
+var serviceName = builder.Configuration["Otlp:ServiceName"]
+    ?? throw new InvalidOperationException(
+        "Otlp:ServiceName не задан в appsettings.json");
+
 builder.Services.AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService(serviceName: "booking-service"))
+    .ConfigureResource(r => r.AddService(serviceName))
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddEntityFrameworkCoreInstrumentation()
         .AddOtlpExporter(o =>
-            o.Endpoint = new Uri(builder.Configuration["Otlp:Endpoint"]!)))
+            o.Endpoint = new Uri(otlpEndpoint)))
     .WithMetrics(metrics => metrics
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
