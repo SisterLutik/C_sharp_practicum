@@ -8,17 +8,16 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Text;
 using EventService.Infrastructure.Kafka;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ============================================
 // 1. Контроллеры
-// ============================================
 builder.Services.AddControllers();
 
-// ============================================
 // 2. Слои Application + Infrastructure
-// ============================================
 builder.Services.AddEventApplicationServices();
 builder.Services.AddEventInfrastructureServices(builder.Configuration);
 
@@ -26,9 +25,7 @@ builder.Services.AddEventInfrastructureServices(builder.Configuration);
 builder.Services.AddHostedService<KafkaTopicInitializer>();
 builder.Services.AddHostedService<BookingConfirmedConsumer>();
 
-// ============================================
 // 3. JWT Authentication
-// ============================================
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtSecret = jwtSection["Secret"]!;
 
@@ -51,9 +48,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// ============================================
 // 4. Swagger + JWT
-// ============================================
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -75,23 +70,30 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// ============================================
+// 5. OpenTelemetry
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(serviceName: "event-service"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter(o =>
+            o.Endpoint = new Uri(builder.Configuration["Otlp:Endpoint"]!)))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter());
 // 5. Build
-// ============================================
 var app = builder.Build();
-
-// ============================================
+app.MapPrometheusScrapingEndpoint();
 // 6. Миграции
-// ============================================
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<EventDbContext>();
     db.Database.Migrate();
 }
 
-// ============================================
 // 7. Пайплайн
-// ============================================
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();

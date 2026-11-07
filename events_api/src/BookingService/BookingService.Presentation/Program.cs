@@ -8,24 +8,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Text;
-
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ============================================
 // 1. Контроллеры
-// ============================================
 builder.Services.AddControllers();
 
-// ============================================
 // 2. Слои Application + Infrastructure
-// ============================================
 builder.Services.AddBookingApplicationServices();
 builder.Services.AddBookingInfrastructureServices(builder.Configuration);
 
-// ============================================
 // 3. JWT Authentication
-// ============================================
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtSecret = jwtSection["Secret"]!;
 
@@ -47,9 +43,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// ============================================
 // 4. Swagger + JWT
-// ============================================
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -71,28 +65,35 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// ============================================
 // 5. Фоновый сервис подтверждения броней
-// ============================================
 builder.Services.AddHostedService<BookingBackgroundService>();
 
-// ============================================
+// OpenTelemetry
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(serviceName: "booking-service"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter(o =>
+            o.Endpoint = new Uri(builder.Configuration["Otlp:Endpoint"]!)))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter());
+
 // 6. Build
-// ============================================
 var app = builder.Build();
 
-// ============================================
+app.MapPrometheusScrapingEndpoint();
 // 7. Миграции
-// ============================================
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
     db.Database.Migrate();
 }
 
-// ============================================
 // 8. Пайплайн
-// ============================================
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
