@@ -11,11 +11,16 @@ using System.Text;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Контроллеры
 builder.Services.AddControllers();
+builder.Host.UseSerilog((ctx, cfg) =>
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+       .WriteTo.Console(new CompactJsonFormatter()));
 
 // 2. Слои Application + Infrastructure
 builder.Services.AddBookingApplicationServices();
