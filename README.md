@@ -66,8 +66,11 @@ events_api/                              корень репозитория
 └── events_api/                          Docker-инфраструктура
     ├── docker-compose.yml
     ├── Dockerfile
+    ├── prometheus.yml
     ├── .env.example
     ├── .env                             (не в git)
+    ├── grafana/
+    │   └── events-api-observability.json
     └── init-db/
         └── 01-create-databases.sql
 
@@ -79,7 +82,7 @@ events_api/                              корень репозитория
 
 - Infrastructure — реализации портов: репозитории, DbContext, миграции, Kafka-продюсеры и консьюмеры, RedisCacheService, компоненты безопасности. Зависит от Application и Domain.
 
-- Presentation — контроллеры, middleware, Program.cs, фоновые сервисы. Зависит от Application и Infrastructure.
+- Presentation — контроллеры, middleware, Program.cs, фоновые сервисы, настройка OpenTelemetry и Serilog. Зависит от Application и Infrastructure.
 
 Роли и доступ
 
@@ -139,7 +142,7 @@ docker compose up --build
 
 docker compose ps
 
-Ожидается шесть контейнеров: events-kafka, events-postgres, events-redis, events-user-service, events-event-service, events-booking-service.
+Ожидается девять контейнеров: events-kafka, events-postgres, events-redis, events-user-service, events-event-service, events-booking-service, events-prometheus, events-jaeger, events-grafana.
 
 6. Откройте Swagger UI:
 
@@ -158,6 +161,10 @@ Docker внутренний порт — 8080 для всех сервисов. 
 5432 | PostgreSQL (один инстанс, три базы)
 6379 | Redis (для отладки через redis-cli с хоста)
 9093 | Kafka (внешний listener для подключения с хоста)
+9090 | Prometheus UI
+16686 | Jaeger UI
+4317 | OTLP gRPC (приём трейсов)
+3000 | Grafana UI
 
 Остановка:
 
@@ -299,6 +306,42 @@ BookingConfirmedConsumer при получении сообщения из Kafka
 - RemoveAsync тихо пропускает удаление (ключ истечёт по TTL)
 
 Клиент не получает ошибку, запрос обслуживается напрямую из БД. Для быстрого переподключения у ConnectionMultiplexer установлен AbortOnConnectFail=false: после восстановления Redis кэш начнёт работать автоматически без перезапуска сервиса.
+
+Наблюдаемость (Observability)
+
+Для сбора, визуализации и анализа данных о работе системы добавлены OpenTelemetry, Serilog, Prometheus, Jaeger и Grafana.
+
+Стек мониторинга:
+
+Инструмент | Назначение | Порт UI
+Prometheus | Сбор метрик (latency, throughput, ошибки, рантайм) | http://localhost:9090
+Jaeger | Распределённые трейсы HTTP-запросов и SQL-запросов EF Core | http://localhost:16686
+Grafana | Дашборды и визуализация метрик из Prometheus | http://localhost:3000
+
+Запуск стека мониторинга:
+
+Мониторинг поднимается вместе со всей системой через docker compose up -d. Дополнительных команд не нужно. После запуска доступны:
+
+- Prometheus: http://localhost:9090 — раздел Status → Targets, три таргета должны быть в статусе UP.
+- Jaeger: http://localhost:16686 — выберите сервис (user-service, event-service, booking-service) и нажмите Find Traces.
+- Grafana: http://localhost:3000 — логин admin, пароль admin. Источник данных Prometheus (http://prometheus:9090) и дашборд Events API Observability подключаются автоматически при старте, если настроен provisioning.
+
+Метрики сервисов также доступны напрямую:
+
+- http://localhost:5001/metrics — UserService
+- http://localhost:5002/metrics — EventService
+- http://localhost:5003/metrics — BookingService
+
+Трейсы принимаются Jaeger по OTLP gRPC на порту 4317. Внутри Docker-сети сервисы отправляют трейсы на http://jaeger:4317 (переопределяется через Otlp__Endpoint в docker-compose.yml). Локально, без Docker, — на http://localhost:4317.
+
+Логи выводятся в JSON через Serilog с CompactJsonFormatter. Каждая строка — отдельный JSON-объект с полями @t (timestamp), @mt (message template), @l (level), SourceContext и именованными параметрами. Уровни задаются в секции Serilog:MinimumLevel в appsettings.json.
+
+Технологии наблюдаемости:
+
+- OpenTelemetry (OpenTelemetry.Extensions.Hosting, OpenTelemetry.Instrumentation.AspNetCore, OpenTelemetry.Instrumentation.Http, OpenTelemetry.Instrumentation.Runtime, OpenTelemetry.Instrumentation.EntityFrameworkCore)
+- Экспортёры OpenTelemetry: OpenTelemetry.Exporter.OpenTelemetryProtocol (OTLP → Jaeger), OpenTelemetry.Exporter.Prometheus.AspNetCore (метрики → Prometheus)
+- Serilog.AspNetCore и Serilog.Formatting.Compact для JSON-логов
+- Prometheus, Jaeger, Grafana в docker-compose.yml
 
 Базы данных
 
@@ -535,6 +578,9 @@ UserRole
 - Apache Kafka (KRaft)
 - Confluent.Kafka
 - JWT (System.IdentityModel.Tokens.Jwt)
+- OpenTelemetry (трейсы, метрики, OTLP, Prometheus)
+- Serilog (JSON-логи)
+- Prometheus, Jaeger, Grafana
 - Testcontainers
 - Swagger / OpenAPI
 - xUnit, FluentAssertions, Moq
@@ -575,7 +621,19 @@ docker exec events-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-se
 
 docker exec events-redis redis-cli ping
 docker exec events-redis redis-cli KEYS "events:*"
-docker exec events-redis redis-cli TTL "events:top10"
+docker exec events-redis redis-cli TTL "events:events:top10"
+
+Проверка метрик Prometheus:
+
+curl "http://localhost:9090/api/v1/targets?state=active"
+
+Проверка трейсов Jaeger:
+
+Откройте http://localhost:16686, выберите сервис и нажмите Find Traces.
+
+Проверка логов (JSON):
+
+docker compose logs -f event-service
 
 Удаление всех данных (включая тома):
 
