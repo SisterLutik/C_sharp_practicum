@@ -2,18 +2,21 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
-using System.IdentityModel.Tokens.Jwt;
-using System.Text;
-using UserService.Application;
-using UserService.Application.Settings;
-using UserService.Infrastructure;
-using UserService.Infrastructure.DataAccess;
-using UserService.Presentation.Middleware;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Formatting.Compact;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
+using UserService.Application;
+using UserService.Application.Interfaces;
+using UserService.Application.Settings;
+using UserService.Domain.Entities;
+using UserService.Domain.Enums;
+using UserService.Infrastructure;
+using UserService.Infrastructure.DataAccess;
+using UserService.Presentation.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, cfg) =>
@@ -101,6 +104,15 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UserDbContext>();
     db.Database.Migrate();
+
+    var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+    if (!await userRepo.ExistsByLoginAsync("admin"))
+    {
+        var admin = new User("admin", hasher.Hash("admin123"), UserRole.Admin);
+        await userRepo.AddAsync(admin);
+    }
 }
 
 // 8. Пайплайн

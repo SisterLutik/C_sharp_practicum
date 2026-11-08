@@ -63,12 +63,18 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Элементы решен
 		.env.example = .env.example
 		docker-compose.yml = docker-compose.yml
 		Dockerfile = Dockerfile
+		..\..\practicum-Grafana.json = ..\..\practicum-Grafana.json
 		prometheus.yml = prometheus.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "init-db", "init-db", "{EB8BDFF3-B71D-47A0-BCBF-A686ADECE78B}"
 	ProjectSection(SolutionItems) = preProject
 		01-create-databases.sql = 01-create-databases.sql
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "grafana", "grafana", "{F408F33E-AF01-4AE0-88F5-3892FCC7B676}"
+	ProjectSection(SolutionItems) = preProject
+		..\..\practicum-Grafana.json = ..\..\practicum-Grafana.json
 	EndProjectSection
 EndProject
 Global
@@ -316,6 +322,7 @@ Global
 		{19A97821-3CE1-CBA3-85BD-31DA5B1FD89C} = {FC738A51-B848-44B1-A2FF-6E030A137B4B}
 		{CF318D15-66FF-A9E7-E5C7-615368D2770E} = {64FE6112-CB22-4FDA-B17F-A64779EE706D}
 		{9B930B18-5438-86FC-4CAA-F2DF31CD299F} = {C54EFAED-F211-47AB-9AF9-9F3EADCA55B7}
+		{F408F33E-AF01-4AE0-88F5-3892FCC7B676} = {5080389B-05B6-4541-87BE-8337D0C2CA3C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {2A0D28DD-DA06-4845-8932-AF95B560A54D}
