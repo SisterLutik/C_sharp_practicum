@@ -55,6 +55,39 @@ services:
       timeout: 5s
       retries: 10
 
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: events-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - user-service
+      - event-service
+      - booking-service
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.56
+    container_name: events-jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: events-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
   user-service:
     build:
       context: ..
@@ -70,10 +103,14 @@ services:
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
+      Otlp__Endpoint: http://jaeger:4317
+      Otlp__ServiceName: user-service
     entrypoint: ["dotnet", "UserService.Presentation.dll"]
     depends_on:
       postgres:
         condition: service_healthy
+      jaeger:
+        condition: service_started
 
   event-service:
     build:
@@ -96,6 +133,8 @@ services:
       Cache__InstanceName: "events:"
       Cache__EventTtlMinutes: 5
       Cache__TopEventsTtlMinutes: 10
+      Otlp__Endpoint: http://jaeger:4317
+      Otlp__ServiceName: event-service
     entrypoint: ["dotnet", "EventService.Presentation.dll"]
     depends_on:
       postgres:
@@ -104,6 +143,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      jaeger:
+        condition: service_started
 
   booking-service:
     build:
@@ -121,12 +162,17 @@ services:
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
       Kafka__BootstrapServers: kafka:9092
+      Otlp__Endpoint: http://jaeger:4317
+      Otlp__ServiceName: booking-service
     entrypoint: ["dotnet", "BookingService.Presentation.dll"]
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      jaeger:
+        condition: service_started
 
 volumes:
   postgres-data:
+  grafana-data:

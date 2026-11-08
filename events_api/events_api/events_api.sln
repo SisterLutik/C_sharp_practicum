@@ -63,6 +63,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Элементы решен
 		.env.example = .env.example
 		docker-compose.yml = docker-compose.yml
 		Dockerfile = Dockerfile
+		prometheus.yml = prometheus.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "init-db", "init-db", "{EB8BDFF3-B71D-47A0-BCBF-A686ADECE78B}"

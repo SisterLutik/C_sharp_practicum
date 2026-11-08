@@ -3,7 +3,6 @@ using EventsApi.Contracts.Kafka;
 using EventService.Application.Caching;
 using EventService.Application.Interfaces;
 using EventService.Domain.Entities;
-using EventService.Application.Caching;
 using EventService.Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
