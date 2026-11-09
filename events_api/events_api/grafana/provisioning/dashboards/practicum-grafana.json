@@ -86,7 +86,7 @@
         "x": 0,
         "y": 0
       },
-      "id": 1,
+      "id": 3,
       "options": {
         "legend": {
           "calcs": [],
@@ -106,41 +106,14 @@
             "uid": "ag3npb4y6st1ca"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name))",
+          "expr": "sum(rate(http_server_request_duration_seconds_count[1m])) by (job)",
           "instant": false,
-          "interval": "",
-          "legendFormat": "p95 {{service_name}}",
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ag3npb4y6st1ca"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "p50 {{service_name}}",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ag3npb4y6st1ca"
-          },
-          "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "p99 {{service_name}}",
-          "range": true,
-          "refId": "C"
         }
       ],
-      "title": "HTTP Latency (p50, p95, p99)",
+      "title": "HTTP Throughput (RPS)",
       "type": "timeseries"
     },
     {
@@ -228,9 +201,9 @@
             "uid": "ag3npb4y6st1ca"
           },
           "editorMode": "code",
-          "expr": "sum(http_server_active_requests) by (service_name)",
+          "expr": "sum(http_server_active_requests) by (job)",
           "instant": false,
-          "legendFormat": "{{service_name}}",
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
@@ -303,7 +276,7 @@
         "x": 0,
         "y": 8
       },
-      "id": 3,
+      "id": 1,
       "options": {
         "legend": {
           "calcs": [],
@@ -323,14 +296,257 @@
             "uid": "ag3npb4y6st1ca"
           },
           "editorMode": "code",
-          "expr": "sum(rate(http_server_request_duration_seconds_count[1m])) by (service_name)",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, job))",
           "instant": false,
-          "legendFormat": "{{service_name}}",
+          "interval": "",
+          "legendFormat": "p95 {{job}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ag3npb4y6st1ca"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, job))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "p50 {{job}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ag3npb4y6st1ca"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, job))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "p99 {{job}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "HTTP Latency (p50, p95, p99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ag3npb4y6st1ca"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ag3npb4y6st1ca"
+          },
+          "editorMode": "code",
+          "expr": "rate(process_runtime_dotnet_gc_collections_count[5m])",
+          "instant": false,
+          "legendFormat": "GC Rate ({{job}})",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ag3npb4y6st1ca"
+          },
+          "editorMode": "code",
+          "expr": "process_runtime_dotnet_gc_heap_size_bytes",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Heap Size ({{job}})",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ag3npb4y6st1ca"
+          },
+          "editorMode": "code",
+          "expr": "process_runtime_dotnet_thread_pool_queue_length",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Thread Queue ({{job}})",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Runtime Metrics (.NET)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ag3npb4y6st1ca"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ag3npb4y6st1ca"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) by (job) \r\n/ \r\nsum(rate(http_server_request_duration_seconds_count[5m])) by (job)",
+          "instant": false,
+          "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "HTTP Throughput (RPS)",
+      "title": "Error Rate (5xx)",
       "type": "timeseries"
     }
   ],
@@ -347,6 +563,6 @@
   "timezone": "browser",
   "title": "practicum",
   "uid": "dg3nrom2kazuoa",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }

@@ -107,6 +107,7 @@ using (var scope = app.Services.CreateScope())
 
 // 7. Пайплайн
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
+app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
 
