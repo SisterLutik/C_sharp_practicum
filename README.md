@@ -48,7 +48,7 @@ events_api/                              корень репозитория
 │   │   ├── EventService.Application/
 │   │   │   └── Settings/               CacheSettings (ConnectionString, TTL)
 │   │   ├── EventService.Infrastructure/
-│   │   │   └── Caching/                RedisSettings удалён, RedisCacheService
+│   │   │   └── Caching/                RedisCacheService
 │   │   └── EventService.Presentation/
 │   │
 │   └── BookingService/
@@ -66,11 +66,19 @@ events_api/                              корень репозитория
 └── events_api/                          Docker-инфраструктура
     ├── docker-compose.yml
     ├── Dockerfile
-    ├── prometheus.yml
+    ├── prometheus.yml                   конфигурация сбора метрик
     ├── .env.example
     ├── .env                             (не в git)
-    ├── grafana/
-    │   └── events-api-observability.json
+    │
+    ├── grafana/                         Провизжининг Grafana
+    │   ├── provisioning/
+    │   │   ├── datasources/
+    │   │   │   └── prometheus.yml       автоподключение источника Prometheus
+    │   │   └── dashboards/
+    │   │       └── dashboards.yml       провайдер дашбордов
+    │   └── dashboards/
+    │       └── practicum-grafana.json   JSON дашборда (импортируется автоматически)
+    │
     └── init-db/
         └── 01-create-databases.sql
 
@@ -320,11 +328,20 @@ Grafana | Дашборды и визуализация метрик из Prometh
 
 Запуск стека мониторинга:
 
-Мониторинг поднимается вместе со всей системой через docker compose up -d. Дополнительных команд не нужно. После запуска доступны:
+Мониторинг поднимается вместе со всей системой через docker compose up -d. Дополнительных команд не нужно.
+
+Дашборд Grafana и источник данных Prometheus подключаются автоматически через механизм provisioning:
+- Файл конфигурации источника данных: events_api/grafana/provisioning/datasources/prometheus.yml
+- Файл конфигурации провайдера дашбордов: events_api/grafana/provisioning/dashboards/dashboards.yml
+- JSON самого дашборда: events_api/grafana/dashboards/practicum-grafana.json
+
+При первом запуске Grafana дашборд "Events API" появится в меню Dashboards автоматически, без ручного импорта. Ошибок "Datasource not found" не будет, так как в JSON дашборда используется фиксированный uid источника данных "prometheus", совпадающий с uid в файле provisioning.
+
+После запуска доступны:
 
 - Prometheus: http://localhost:9090 — раздел Status → Targets, три таргета должны быть в статусе UP.
 - Jaeger: http://localhost:16686 — выберите сервис (user-service, event-service, booking-service) и нажмите Find Traces.
-- Grafana: http://localhost:3000 — логин admin, пароль admin. Источник данных Prometheus (http://prometheus:9090) и дашборд Events API Observability подключаются автоматически при старте, если настроен provisioning.
+- Grafana: http://localhost:3000 — логин admin, пароль admin.
 
 Метрики сервисов также доступны напрямую:
 
