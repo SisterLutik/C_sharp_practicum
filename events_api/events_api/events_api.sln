@@ -73,17 +73,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "init-db", "init-db", "{EB8B
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "grafana", "grafana", "{F408F33E-AF01-4AE0-88F5-3892FCC7B676}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "provisioning", "provisioning", "{C42F18E1-0856-4276-A432-CEE249D88DDC}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "datasources", "datasources", "{67CA4DBB-EFB7-49F6-ADE5-3B9C18B3CE1D}"
 	ProjectSection(SolutionItems) = preProject
-		grafana\provisioning\datasources\prometheus.yml = grafana\provisioning\datasources\prometheus.yml
+		grafana\datasources\prometheus.yml = grafana\datasources\prometheus.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dashboards", "dashboards", "{5B65AD44-269B-4CAB-A358-F1D9EA192E41}"
 	ProjectSection(SolutionItems) = preProject
-		grafana\provisioning\dashboards\dashboards.yml = grafana\provisioning\dashboards\dashboards.yml
-		grafana\provisioning\dashboards\practicum-grafana.json = grafana\provisioning\dashboards\practicum-grafana.json
+		grafana\dashboards\dashboards.yml = grafana\dashboards\dashboards.yml
+		grafana\dashboards\practicum-grafana.json = grafana\dashboards\practicum-grafana.json
 	EndProjectSection
 EndProject
 Global
@@ -332,9 +330,8 @@ Global
 		{CF318D15-66FF-A9E7-E5C7-615368D2770E} = {64FE6112-CB22-4FDA-B17F-A64779EE706D}
 		{9B930B18-5438-86FC-4CAA-F2DF31CD299F} = {C54EFAED-F211-47AB-9AF9-9F3EADCA55B7}
 		{F408F33E-AF01-4AE0-88F5-3892FCC7B676} = {5080389B-05B6-4541-87BE-8337D0C2CA3C}
-		{C42F18E1-0856-4276-A432-CEE249D88DDC} = {F408F33E-AF01-4AE0-88F5-3892FCC7B676}
-		{67CA4DBB-EFB7-49F6-ADE5-3B9C18B3CE1D} = {C42F18E1-0856-4276-A432-CEE249D88DDC}
-		{5B65AD44-269B-4CAB-A358-F1D9EA192E41} = {C42F18E1-0856-4276-A432-CEE249D88DDC}
+		{67CA4DBB-EFB7-49F6-ADE5-3B9C18B3CE1D} = {F408F33E-AF01-4AE0-88F5-3892FCC7B676}
+		{5B65AD44-269B-4CAB-A358-F1D9EA192E41} = {F408F33E-AF01-4AE0-88F5-3892FCC7B676}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {2A0D28DD-DA06-4845-8932-AF95B560A54D}

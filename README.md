@@ -487,9 +487,9 @@ dotnet test
 
 Юнит-тесты конкретного сервиса:
 
-dotnet test tests/UserService.Tests/UserService.Tests.csproj
-dotnet test tests/EventService.Tests/EventService.Tests.csproj
-dotnet test tests/BookingService.Tests/BookingService.Tests.csproj
+dotnet test events_api/events_api.Tests/EventService.Tests/EventService.Tests.csproj
+dotnet test events_api/events_api.Tests/BookingService.Tests/BookingService.Tests.csproj
+dotnet test events_api/events_api.Tests/UserService.Tests/UserService.Tests.csproj
 
 Интеграционные тесты (требуют запущенный Docker):
 

@@ -84,7 +84,10 @@ var serviceName = builder.Configuration["Otlp:ServiceName"]
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(r => r.AddService(serviceName))
     .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation()
+        .AddAspNetCoreInstrumentation(options =>
+        {
+            options.Filter = httpContext => !httpContext.Request.Path.StartsWithSegments("/metrics");
+        })
         .AddHttpClientInstrumentation()
         .AddEntityFrameworkCoreInstrumentation()
         .AddOtlpExporter(o =>
@@ -105,9 +108,9 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
+app.UseSerilogRequestLogging();
 // 8. Пайплайн
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
-app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
 
